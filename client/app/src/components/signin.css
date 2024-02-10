@@ -1,0 +1,7 @@
+#registration {
+width: 100%;
+display: inline-flex;
+gap: 1rem;
+justify-content: flex-end;
+padding-right: 1rem;
+}

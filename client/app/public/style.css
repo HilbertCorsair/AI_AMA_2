@@ -1,0 +1,422 @@
+@font-face {
+  font-family: 'Allura';
+  src: url('./assets/Allura/Allura-Regular.woff2') format('woff2');
+  }
+
+@font-face {
+  font-family: 'Cutive';
+  src: url('./assets/Cutive_Mono/CutiveMono-Regular.woff2') format('woff2');
+  }
+
+@font-face {
+  font-family: 'Allerta';
+  src: url('./assets/Allerta_Stencil/AllertaStencil-Regular.woff2') format('woff2')
+  }
+
+@font-face {
+  font-family: 'Voltaire';
+  src: url('./assets/Voltaire/Voltaire-Regular.woff2') format('woff2');
+  }
+@font-face {
+  font-family: 'Arsenal';
+  src: url('./assets/Arsenal/Arsenal-Regular.woff2') format('woff2');
+  }
+  
+@font-face {
+  font-family: 'Orbitron' ;
+  src: url('./assets/Orbitron/Orbitron-VariableFont_wght.ttf');
+}
+
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 100vw;
+  align-items: center;
+}
+
+div.greeting{
+  padding: 10% 10%;
+}
+
+#intro{
+  font-family: Allura;
+  font-size: 2rem;
+}
+
+#disclamer{
+  font-family: Arsenal;
+  font-size: 0.8rem;
+}
+
+#h_space {
+  max-width: 12%;
+  max-height: auto;
+  overflow: hidden;
+}
+
+banner{
+  background-color: black;
+  display: flex;
+  max-height: 155px;
+  align-items: center;
+}
+
+
+banner h1{
+  padding-left: 6%;
+  padding-right: 2%;
+  font-size: 4rem;
+  font-family: Orbitron;
+  color: white;
+  display: inline;
+  align-self: center;
+}
+
+
+ul.banner-menu {
+  padding-left: 6%;
+  align-self: center
+}
+
+ul.banner-menu li{
+  display: inline-block;
+}
+
+ul.banner-menu li a{
+  display: inline-block;
+  text-decoration: none;
+  font-family: Arsenal;
+  font-size: 1.2rem;
+  color:white;
+}
+
+#menu {
+  display: inline-block;
+  font-family: Arsenal;
+  font-size: 1.2rem;
+  color:white;
+  text-decoration: none;
+}
+
+
+ul.banner-menu li:not(:last-child)::after {
+
+  margin: 0 5px; /* Adjust the spacing as needed */
+  color: white; /* Adjust the color as needed */
+}
+
+ul.banner-menu li:first-child::before,
+ul.banner-menu li:last-child::after {
+  
+  margin: 0 5px; /* Adjust the spacing as needed */
+  color: white; /* Adjust the color as needed */
+}
+
+#newsContainer a {
+  max-width: 74%;
+  max-height: auto;
+  margin-bottom: 3px;
+  font-family: Voltaire;
+  font-size: 1.2rem;
+  text-decoration: none;
+
+}
+
+@media (max-width: 428px) {
+  banner {
+    flex-direction: column;
+  }
+}
+
+
+
+#fed_image {
+  max-width: 25%;
+  max-height: auto;
+  display: inline-flex;
+  flex-direction: column;
+
+}
+
+.flex-container {
+  width: 100%;
+  margin: 0 0;
+  border:2px solid #10a37f;
+  display: inline-flex;
+  flex-direction: column;
+}
+
+@media only screen and (max-width: 1112px) {
+  
+  banner h1{
+    padding-left: 3%;
+    padding-right: 2%;
+    font-size: 1.2rem;
+    font-family: Orbitron;
+    color: white;
+    display: inline;
+    align-self: center;
+  }
+
+  ul.banner-menu li a{
+    display: inline-block;
+    font-family: Arsenal;
+    font-size: 1rem;
+    color:white;
+  } 
+}
+
+
+#app {
+  /*
+  width: 100vw;
+  height: 100vh;
+  */
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  /*align-items: center;*/
+  justify-content: space-between;
+}
+
+#chat_container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  overflow-y: scroll;
+  margin: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+
+  padding-bottom: 20px;
+  scroll-behavior: smooth;
+}
+
+h1 {
+  font-family: "Arsenal";
+}
+
+/* hides scrollbar */
+#chat_container::-webkit-scrollbar {
+  display: none;
+}
+
+.wrapper {
+  width: 100%;
+  padding: 15px;
+}
+
+.ai div .message{
+  font-family: Arsenal;
+}
+
+.chat {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  font-family: Allura;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+
+
+
+#h_space {
+  max-width: 12%;
+  max-height: auto;
+  overflow: hidden;
+}
+
+#banner{
+  background-color: black;
+  display: flex;
+  max-height: 155px;
+  align-items: center;
+}
+
+
+#banner h1{
+  padding-left: 6%;
+  padding-right: 2%;
+  font-size: 2rem;
+  font-family: Orbitron;
+  color: white;
+  display: inline;
+  align-self: center;
+}
+
+
+ul.banner-menu {
+  padding-left: 6%;
+  align-self: center
+}
+
+ul.banner-menu li{
+  display: inline-block;
+}
+
+ul.banner-menu li {
+  display: inline-block;
+  text-decoration: none;
+  font-family: Arsenal;
+  font-size: 1.2rem;
+  color:white;
+}
+
+ul.banner-menu li:hover {
+  cursor: pointer; /* Cursor style changes to a hand when hovering */
+  font-weight: bold; /* Text becomes bold when hovering */
+}
+
+#menu {
+  display: inline-block;
+  font-family: Arsenal;
+  font-size: 1.2rem;
+  color:white;
+  text-decoration: none;
+}
+
+
+
+ul.banner-menu li:not(:last-child)::after {
+  content: "|";
+  margin: 0 5px; /* Adjust the spacing as needed */
+  color: white; /* Adjust the color as needed */
+}
+
+ul.banner-menu li:first-child::before,
+ul.banner-menu li:last-child::after {
+  margin: 0 5px; /* Adjust the spacing as needed */
+  color: white; /* Adjust the color as needed */
+}
+
+
+.profile {
+  width: 36px;
+  height: 36px;
+  border-radius: 5px;
+
+  background: #5436DA;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.ai .profile {
+  background: #10a37f;
+}
+
+.profile img {
+  width: 60%;
+  height: 60%;
+  object-fit: contain;
+}
+
+.message {
+  flex: 1;
+  color: black;
+
+  font-size: 20px;
+
+  max-width: 100%;
+  overflow-x: scroll;
+
+  /*
+   * white space refers to any spaces, tabs, or newline characters that are used to format the CSS code
+   * specifies how white space within an element should be handled. It is similar to the "pre" value, which tells the browser to treat all white space as significant and to preserve it exactly as it appears in the source code.
+   * The pre-wrap value allows the browser to wrap long lines of text onto multiple lines if necessary.
+   * The default value for the white-space property in CSS is "normal". This tells the browser to collapse multiple white space characters into a single space, and to wrap text onto multiple lines as needed to fit within its container.
+  */
+  white-space: pre-wrap; 
+
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+ hides scrollbar */
+.message::-webkit-scrollbar {
+  display: none;
+}
+
+form {
+  width: 100%;
+  /*max-width: 1280px;*/
+  margin: 0 auto;
+  padding: 10px;
+  border:2px solid #10a37f;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+textarea {
+  width: 100%;
+  font-size: 18px;
+  color: black;
+  padding: 10px;
+  background: transparent;
+  border-radius: 5px;
+  border: none;
+  outline: none;
+  font-family: Cutive;
+}
+
+button {
+  outline: 0;
+  border: 0;
+  cursor: pointer;
+  background: transparent;
+}
+
+#bm1 {
+  -ms-flex-item-align: end;
+}
+
+form img {
+  width: 30px;
+  height: 30px;
+}
+
+@media (max-width: 428px) {
+  banner {
+    flex-direction: column;
+  }
+}
+
+
+@media only screen and (max-width: 1112px) {
+  
+  banner h1{
+    padding-left: 3%;
+    padding-right: 2%;
+    font-size: 1.2rem;
+    font-family: Orbitron;
+    color: white;
+    display: inline;
+    align-self: center;
+  }
+
+
+  ul.banner-menu li a{
+    display: inline-block;
+    font-family: Arsenal;
+    font-size: 1rem;
+    color:white;
+  }
+
+
+}

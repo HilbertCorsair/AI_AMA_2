@@ -1,0 +1,71 @@
+@font-face {
+    font-family: 'Orbitron' ;
+    src: url('../../public/assets/Orbitron/Orbitron-VariableFont_wght.ttf');
+  }
+
+@font-face {
+font-family: 'Arsenal';
+src: url('../../public/assets/Arsenal/Arsenal-Regular.woff2') format('woff2');
+}
+
+#banner{
+    background-color: black;
+    display: flex;
+    max-height: 155px;
+    align-items: center;
+    justify-content: space-between;
+  
+}
+.nav a{
+    text-decoration: none;
+    color: inherit;
+}
+
+.containe.greeting {
+  padding: 2rem;
+}
+
+.nav ul{
+    list-style: none;
+    padding-right: 1rem;
+    margin: 0;
+    display: flex;
+    text-decoration: none;
+    font-family: Arsenal;
+    color:white;
+    gap: 1rem;
+    
+
+}
+
+.banner-menu li {
+    display: inline-block;
+    font-family: Arsenal;
+    font-size: 1.5rem;
+    color:white;
+  }
+.banner-menu li:hover {
+    font-weight: bolder;
+}
+
+
+#h_space {
+    max-width: 12%;
+    max-height: auto;
+    overflow: hidden;
+  }
+
+#banner h1{
+    font-size: 3rem;
+    font-family: Orbitron;
+    color: white;
+    display: inline;
+    align-self: center;
+}
+
+
+@media (max-width: 428px) {
+    banner {
+      flex-direction: column;
+    }
+  }

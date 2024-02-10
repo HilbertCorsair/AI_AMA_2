@@ -1,0 +1,165 @@
+@font-face {
+    font-family: 'Allura';
+    src: url('../../public/assets/Allura/Allura-Regular.woff2') format('woff2');
+    }
+  
+  @font-face {
+    font-family: 'Cutive';
+    src: url('../../public/assets/Cutive_Mono/CutiveMono-Regular.woff2') format('woff2');
+    }
+  
+  @font-face {
+    font-family: 'Allerta';
+    src: url('../../public/assets/Allerta_Stencil/AllertaStencil-Regular.woff2') format('woff2')
+    }
+  
+  @font-face {
+    font-family: 'Voltaire';
+    src: url('../../public/assets/Voltaire/Voltaire-Regular.woff2') format('woff2');
+    }
+  @font-face {
+    font-family: 'Arsenal';
+    src: url('../../public/assets/Arsenal/Arsenal-Regular.woff2') format('woff2');
+    }
+    
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    }
+    
+
+div.greeting{
+    padding: 10% 10%;
+}
+
+#intro{
+    font-family: Allura;
+    font-size: 2rem;
+}
+
+#disclamer{
+    font-family: Arsenal;
+    font-size: 0.8rem;
+}
+
+
+#app {
+    /*
+    width: 100vw;
+    height: 100vh;
+    */
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    /*align-items: center;*/
+    justify-content: space-between;
+  }
+  
+  #chat_container {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    overflow-y: scroll;
+    margin: 0;
+  
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  
+    padding-bottom: 20px;
+    scroll-behavior: smooth;
+  }
+  
+  h1 {
+    font-family: "Arsenal";
+  }
+  
+  /* hides scrollbar */
+  #chat_container::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .wrapper {
+    width: 100%;
+    padding: 15px;
+  }
+  
+  .ai div .message{
+    font-family: Arsenal;
+  }
+  
+form {
+    width: 100%;
+    /*max-width: 1280px;*/
+    margin: 0 auto;
+    padding: 10px;
+    border:2px solid #10a37f;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+  }
+  
+  textarea {
+    width: 100%;
+    font-size: 18px;
+    color: black;
+    padding: 10px;
+    background: transparent;
+    border-radius: 5px;
+    border: none;
+    outline: none;
+    font-family: Cutive;
+  }
+  
+  button {
+    outline: 0;
+    border: 0;
+    cursor: pointer;
+    background: transparent;
+  }
+  
+  form img {
+    width: 30px;
+    height: 30px;
+  }
+
+  .profile {
+    width: 36px;
+    height: 36px;
+    border-radius: 5px;
+    background: #210e74;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .ai .profile {
+    background: #033528;
+  }
+  
+  .chat.profile img {
+    width: 60%;
+    height: 60%;
+    object-fit: contain;
+  }
+
+  .chat {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    font-family: Allura;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 1rem
+  }
+  div .message{
+    max-width: 95%;
+    text-align: justify;
+    font-size: 1.2rem;
+  }
