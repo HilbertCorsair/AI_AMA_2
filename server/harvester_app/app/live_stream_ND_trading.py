@@ -1,15 +1,18 @@
 import numpy as np
+import schedule
 from time import sleep
 import pandas as pd
 from binance.client import Client
 from binance import ThreadedWebsocketManager
 import btalib as bl
+import dash
+from dash import dcc, html
+from dash.dependencies import Input, Output
 import plotly.graph_objs as go
 from matplotlib.dates import date2num
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
-
-
+import pandas_ta as ta
 
 coins = [
     "BTC", "ADA", "MINA", "PAXG", "AGIX", "DOT", "ALGO", "BNB", "MATIC", "LINK", "AR", "AAVE", "EGLD",
@@ -61,34 +64,44 @@ def import_coin_data(pth):
     df.index = pd.to_datetime(df.index, unit='ms')
     return df
 
+def norm_augment(df): 
+    #df = df.drop_duplicates().copy()
+    # Assuming df is a pandas DataFrame with 'high', 'low', 'open', 'close' columns.
+    top_price = df['high'].max()
+    bottom_price = df['low'].min()
 
-def norm_augment(df) :
-    rng = range(len(df.index))
-    top_price = max(df.loc[:,'high'])
-    botom_price = min(df.loc[:,"low"])
-    #first : store the average price in the avg col 
-    df.loc[:,'avg'] = [(df["high"][i] + df["low"][i])/2 for i in rng]
-    #df.loc[:, "prc_spread"] = [[((df["high"][i] - df["low"][i])/(2*df["avg"][i]))*100 for i in rng]]
-    # !!! SUPER IMPORTANT price values are overwritten with their normalized values (min - max normalisation)
-    # this step makes it possible to compare the MACD values across all coins 
-    # MACD values are not calculated on the absolute prices but on their respective normalized values
-    df.loc[:,"open"] = [(df["open"][i] - botom_price)/(top_price - botom_price) for i in rng]
-    df.loc[:,"high"] = [(df["high"][i] - botom_price)/(top_price - botom_price) for i in rng]
-    df.loc[:,"low"] = [(df["low"][i] - botom_price)/(top_price - botom_price) for i in rng]
-    df.loc[:,"close"] = [(df["close"][i] - botom_price)/(top_price - botom_price) for i in rng]
-    #df.loc[:, "3ema"] = [bl.ema(df['close'][i], period=3)for i in rng]
-    #df.loc[:, "7sma"] = bl.sma(df['close'], period=7)
+    # Vectorized operations for efficiency
+    df['avg'] = (df['high'] + df['low']) / 2
+    df['open'] = (df['open'] - bottom_price) / (top_price - bottom_price)
+    df['high'] = (df['high'] - bottom_price) / (top_price - bottom_price)
+    df['low'] = (df['low'] - bottom_price) / (top_price - bottom_price)
+    df['close'] = (df['close'] - bottom_price) / (top_price - bottom_price)
+    df = df.loc[~df.index.duplicated(keep='first')]
 
-    macd = bl.macd(df, pfast = 8, pslow = 63, psignal = 11)
-    df = df.join(macd.df)
-    df = df.tail(1000)
-    x = np.array([date2num(d) for d in  df.index])
-    y = df.loc[:,'histogram'].values
-    lowess = sm.nonparametric.lowess
-    df['LOWESS'] = lowess(df.loc[:,'histogram'], x, frac=0.0197)[:, 1]
-    df.loc[:, "momentum"] = np.gradient(x, y)
-    return df.tail(6*24) 
+    # Calculate MACD using pandas_ta
+    macd = df.ta.macd(close='close', fast=12, slow=26, signal=9)
+    df = pd.concat([df, macd], axis=1)
 
+    # Limit df to the last 1000 entries
+    df.dropna(inplace=True)
+    
+
+    # Convert index to matplotlib date numbers if index is datetime
+    if isinstance(df.index, pd.DatetimeIndex):
+        x = np.array([date2num(d) for d in df.index])
+    else:
+        x = np.arange(len(df))
+
+    y = df['MACDh_12_26_9'].values
+    # Momentum calculation
+    df['momentum'] = np.gradient(y, x)
+
+    # LOWESS smoothing
+    #lowess = sm.nonparametric.lowess(y, x, frac=0.019)
+    #df['LOWESS'] = lowess[:, 1]
+
+
+    return df
 
 # Updating the Coins data dictionary
 def update_pair (pair, timestamp):
@@ -180,32 +193,53 @@ def buy( pair, q , price):
         print(e)
 
 #==========================================================================================================
-data_files =  [f'/home/honeybadger/projects/harvester/data/h/{pair}.csv'for pair in pairs ] 
+#data_files =  [f'/home/honeybadger/projects/harvester/data/h/{pair}.csv'for pair in pairs ] 
 #c_data = [import_coin_data(pth) for pth in data_files] #from old csvs !!! ALSO ADDS DATES AS INDEXES
-c_data = [pd.read_pickle(f"/home/honeybadger/projects/harvester/data/h/pkls/{p}.pkl") for p in pairs]
-c_dict = dict(zip(pairs, c_data))
+
 
 # # UPDATE FILES AND REWRITE the pkl files
+def update_h_candles(pairs):
+    c_data = [pd.read_pickle(f"/home/honeybadger/projects/harvester/data/h/pkls/{p}.pkl").tail(468) for p in pairs]
+    c_dict = dict(zip(pairs, c_data))
+    for p in pairs:
+        timestamp =  int(c_dict[p].index[-1].timestamp())*1000
+        # This part is useless if data in c_dict is up to date
+        new_df = update_pair(p, timestamp).iloc[1 : ]
+        
+        if not new_df.empty:
+            # Add data to existing dict and also save updatated to pkl
+            c_dict[p] = pd.concat([c_dict[p], new_df], axis=0)
+            c_dict[p].to_pickle(path = f"/home/honeybadger/projects/harvester/data/h/pkls/{p}.pkl")
+            print(f"{p} updated")
+        else:
+            print("No new data.")
+    print("Update complete!")
 
-for p in pairs:
-    timestamp =  str(int(c_dict[p].index[-2].timestamp())*1000)
-    # This part is useless if data in c_dict is up to date
-    new_df = update_pair(p, timestamp)
-    if not new_df.empty:
-        # Add data to existing dict and also save updatated to pkl
-        c_dict[p] = pd.concat([c_dict[p], new_df], axis=0)
-        c_dict[p].to_pickle(path = f"/home/honeybadger/projects/harvester/data/h/pkls/{p}.pkl")
-        print(f"{p} updated")
-    else:
-        print("No new data.")
-print("Update complete!")
+    for pair, df in c_dict.items():
+        c_dict[pair] = norm_augment(df)
+        cols = c_dict[pair].columns   
+        c_dict[pair].columns = [f'{pair}_{col}' for col in cols ]
+        print(f"{pair}: {c_dict[pair][f"{pair}_MACDh_12_26_9"].iloc[-1]}")
+    
+    return c_dict
 
-for pair, df in c_dict.items():
-    print("Augmenting data!")
-    c_dict[pair] = norm_augment(df)
-    print("Data augmented")
-    cols = c_dict[pair].columns   
-    c_dict[pair].columns = [f'{pair}_{col}' for col in cols ]
+
+# Schedule the process function to run every hour
+def process():
+    c_dict = update_h_candles(pairs)
+
+    fig = go.Figure()
+    for p, df in c_dict.items():
+        fig.add_trace(go.Scatter(x=c_dict[p].index, y=c_dict[p][f'{p}_MACDh_12_26_9'].values, mode='lines', name=p))
+
+
+process()
+schedule.every().hour.do(process)
+
+# Loop to keep the script running
+while True:
+    schedule.run_pending()
+    sleep(1)
 
 #plt.plot(c_dict["BTCUSDT"].index, c_dict['BTCUSDT']["BTCUSDT_histogram"].values)
 
@@ -213,21 +247,13 @@ for pair, df in c_dict.items():
 #for p  in pairs :
 #    plt.plot(c_dict[p].index, c_dict[p][f'{p}_histogram'].values, label = p)
 #    #plt.text(c_dict[p].index[0], c_dict[p][f'{p}_histogram'][0], p , fontsize=9, verticalalignment='bottom')
-import plotly.graph_objects as go
 
-fig = go.Figure()
-for p in c_dict:
-    #if p in ["BTCUSDT", "ADAUSDT", "MINAUSDT"]:
-        #fig.add_trace(go.Scatter(x=c_dict[p].index, y=c_dict[p][f'{p}_histogram'].values, mode='lines', name=p))
-    fig.add_trace(go.Scatter(x=c_dict[p].index, y=c_dict[p][f'{p}_LOWESS'].values, mode='lines', name=p))
-
-fig.show() 
 # Additional plot formatting
-plt.xlabel('time (h)')
-plt.ylabel('macnd hyst')
-plt.title('coins of interest')
-plt.legend()
-plt.show()
+#plt.xlabel('time (h)')
+#plt.ylabel('macnd hyst')
+#plt.title('coins of interest')
+#plt.legend()
+#plt.show()
 
 
 stats_dict = {}
@@ -242,25 +268,5 @@ for p in pairs:
 print(stats_dict["MINAUSDT"])
 
 
-
-
-price = get_price("MINAUSDT")
-print(stats_dict["MINAUSDT"][1] * 2 +price )
-print(stats_dict["MINAUSDT"][1] + price )
-print(price)
-print(price - 2* stats_dict["MINAUSDT"][1])
-print(price - stats_dict["MINAUSDT"][1])
-
-try:
-    open_orders = cli.get_open_orders()
-    if open_orders:
-        order_id = open_orders[0]["orderId"]
-        print(order_id)
-        #print( cli.get_order(symbol='MINAUSDT', orderId=order_id))
-
-except Exception as e:
-    print(f"An error occurred: {e}")  
-
-print("All done !")
 
 

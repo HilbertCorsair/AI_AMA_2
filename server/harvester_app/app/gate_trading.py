@@ -10,7 +10,7 @@ import time
 # satisfies your auth use case.
 
 
-def unlock_gate (fname = '/home/honeybadger/projects/harvester/gatev4.txt'):
+def unlock_gate (fname = 'gatev4.txt'):
     with open(fname) as f:
         lines = f.readlines()
     a = lines[0].splitlines()[0]
@@ -60,8 +60,7 @@ except GateApiException as ex:
 except ApiException as e:
     print("Exception when calling SpotApi->list_tickers: %s\n" % e)
 
-"""
-import requests
+ximport requests
 ts = 1665734400
 now = time.time()
 stop = ts + 3600*997
@@ -90,6 +89,71 @@ with open(pth, 'a') as d:
                 print(line)
         else:
             pass
+"""
 
-print('All done check files')
 
+# Define the API client
+api_client, spot_api = unlock_gate()
+
+def get_btc_price():
+    # Fetch the ticker information for the BTCUSDT pair
+    ticker = spot_api.list_tickers(currency_pair='BTC_USDT')
+    # The API returns a list of tickers, but since we requested only one pair, we can take the first element
+    latest_price = ticker[0].last
+    print(f"The latest price for BTCUSDT is: {latest_price}")
+    return latest_price
+
+currency_pair = "BTC_USDT"
+amount = "0.01"  # The amount of BTC you want to buy
+price = "30000"  # The price at which you want to buy 1 BTC
+
+limit_dict = {
+    "side": "",
+    "pair":"", 
+    "amount":"",
+    "price": "",
+    "type" : "limit" 
+}
+
+def place_limit_order(limit_dict):
+    order = gate_api.Order(
+        currency_pair=limit_dict["pair"].replace("_", ""), # Ensure the pair format is correct, e.g., "BTCUSDT" instead of "BTC_USDT"
+        side=limit_dict["side"], # "buy" or "sell"
+        amount=str(limit_dict["amount"]),
+        price=str(limit_dict["price"]),
+        time_in_force="gtc", # Good Till Cancel
+        type=limit_dict["type"] # "limit"
+    )
+    try:
+        # Place the limit order
+        response = spot_api.create_order(order)
+        print(f"Order placed successfully: {response}")
+        return response
+    except ApiException as e:
+        print(f"An error occurred while placing the order: {e}")
+        return None
+
+holding = 5
+def limit_general(buy_target, sell_target):
+    cp = get_btc_price()
+    if cp <= buy_target and USDT_holding >= 10 :
+        limit_dict = {
+            "side": "buy",
+            "pair":"",
+            "amount":"",
+            "price": "",
+            "type" : "limit"
+            } 
+    elif cp >= sell_target and holding >= 10 :
+        limit_dict = {
+            "side": "sell",
+            "pair":"",
+            "amount":"",
+            "price": "",
+            "type" : "limit" 
+            }
+    else:
+        print("No action!")
+        
+
+    

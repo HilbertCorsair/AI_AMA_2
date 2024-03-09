@@ -1,5 +1,6 @@
 from binance import Client
 import oerations as ops
+
 def unlock (fname = 'nancy.txt'):
     with open(fname) as f:
         lines = f.readlines()
