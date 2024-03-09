@@ -154,6 +154,6 @@ def limit_general(buy_target, sell_target):
             }
     else:
         print("No action!")
-        
+
 
     
