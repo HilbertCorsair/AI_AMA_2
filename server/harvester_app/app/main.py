@@ -1,8 +1,9 @@
-import AccountStatus
-import oerations as ops
+#import AccountStatus
+import operations as ops
+
 from binance.enums import *
 from time import sleep
-cli = AccountStatus.unlock()
+#cli = AccountStatus.unlock()
 
 
 pairs = [ "JUPUSDT", "PYTHUSDT"]

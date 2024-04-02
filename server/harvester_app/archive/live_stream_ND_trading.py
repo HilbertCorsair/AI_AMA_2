@@ -5,8 +5,6 @@ import pandas as pd
 from binance.client import Client
 from binance import ThreadedWebsocketManager
 import btalib as bl
-import dash
-from dash import dcc, html
 from dash.dependencies import Input, Output
 import plotly.graph_objs as go
 from matplotlib.dates import date2num
@@ -36,7 +34,7 @@ pairs = [f'{c}USDT' for c in of_interest]
 
 
 BUSD_decs = [2, 4, 3, 0, 5, 2, 3, 2]
-C_decs = [5, 1, 1, 4, 2, 3, 2, 3]
+C_decs = [5, 1, 1, 4, 0, 3, 2, 3]
 
 rounding_order_price = dict(zip(pairs, BUSD_decs))
 rounding_order_crypro_amount = dict(zip(pairs, C_decs))
@@ -201,6 +199,7 @@ def buy( pair, q , price):
 def update_h_candles(pairs):
     c_data = [pd.read_pickle(f"/home/honeybadger/projects/harvester/data/h/pkls/{p}.pkl").tail(468) for p in pairs]
     c_dict = dict(zip(pairs, c_data))
+    
     for p in pairs:
         timestamp =  int(c_dict[p].index[-1].timestamp())*1000
         # This part is useless if data in c_dict is up to date
@@ -214,32 +213,130 @@ def update_h_candles(pairs):
         else:
             print("No new data.")
     print("Update complete!")
-
+    
     for pair, df in c_dict.items():
         c_dict[pair] = norm_augment(df)
         cols = c_dict[pair].columns   
         c_dict[pair].columns = [f'{pair}_{col}' for col in cols ]
-        print(f"{pair}: {c_dict[pair][f"{pair}_MACDh_12_26_9"].iloc[-1]}")
-    
+
     return c_dict
 
 
 # Schedule the process function to run every hour
 def process():
     c_dict = update_h_candles(pairs)
+    prices_dict = dict(zip(pairs, [get_price(pair) for pair in pairs]))
+    #buy = []
+    #sell = []
+    lbls = of_interest
+    record = {}
+    for c in coins:
+        record[c] = pd.DataFrame( columns = ["sign", 'hyst'])
+
+    balance = [cli.get_asset_balance(c)for c in lbls + ["USDT"]]
+    
+    stash = dict(zip(lbls + ["USDT"], [float(d["free"]) for d in balance if d["asset"] in lbls + ["USDT"]]))
+    # Determining the holding position
+    valuations = {}
+    for k, val in prices_dict.items():
+        coin = [c for c in lbls if c in k][0]
+        valuations[coin] = val * stash[coin]
+    valuations["USDT"] = stash["USDT"]
+    valuations = pd.Series(valuations)
+    
+    bought = valuations.idxmax()
+
+    bags = {"fiat": 100}
+    for c in lbls:
+        bags[c]= 0
+
+    market_dict = {}
+    for p in pairs:
+        hist = c_dict[p][f"{p}_MACDh_12_26_9"].iloc[-1]
+        momentum =c_dict[p][f"{p}_momentum"].iloc[-1]
+        pi =c_dict[p][f"{p}_avg"].iloc[0]
+        pf = c_dict[p][f"{p}_avg"].iloc[-1]
+        mm = round((pf - pi)/pi, 2 )     
+        print(f"{p}: {round(hist, 5)}: {round(momentum, 4)}, {round(pi,2)} --> {round(pf, 2)} | {mm}")
+        market_dict[p] = (c_dict[p][f'{p}_avg'].iloc[-1] - c_dict[p][f'{p}_avg'].iloc[0] ) /c_dict[p][f'{p}_avg'].iloc[0]
+    
+    avg_mkt = sum(market_dict.values())/len(pairs)
+    print(f"Average market move: {round(avg_mkt*100, 2)}" )
+
+    big_df = pd.concat(c_dict.values(), axis= 1)
+
+    
+    for ind in big_df.index :
+        #ind2 = df.index[i+ 1] if not i > 2653  else df.index[i]
+        #print(ind)
+        #day = weekDays[ind.weekday()]
+
+        histos = big_df.loc[ind, : ].filter(like = "MACDh_12_26_9" ) == "USDT" != "USDT"
+        histos.sort_values(ascending=False, inplace= True)
+    
+        momentae = big_df.loc[ind, : ].filter(like = "momentum" )
+        momentae.sort_values(ascending = False, inplace = True)
+        # take snapshot of the amplitude and direction of the price movement 
+        
+        pair = momentae.idxmax().split("_")[0]
+        #pair_hist = histos[0]
+        vector  = momentae.loc[f"{pair}_momentum"]
+
+        if  vector > 0.01 and bought == "USDT":
+            #pair = snapshot["hist_max_idx"].split("_")[0]
+            # BUY !
+            #place buy order
+            bought = [str for str in lbls if str in pair][0]
+    
+            bags[bought] = bags["fiat"] / big_df.loc[ind, f'{bought}USDT_avg']
+            bags["fiat"] = 0
+            #print(f"4. Bought {bought}")
+
+            td = {"date": [ind], "sign": [1], "hyst": [big_df.loc[ind, f'{bought}USDT_MACDh_12_26_9']]}
+            store = pd.DataFrame(td)
+            store.set_index("date", inplace= True)
+            record[bought] = pd.concat([record[bought], store], axis=0)
+            q = round ((stash["USDT"]-5)/prices_dict[pair], rounding_order_crypro_amount[pair])
+            p = round(prices_dict[pair], rounding_order_price[pair])
+            print(f'buying {q} of {pair} for {p}')
+            buy(pair, q, p)
+
+        elif vector < 0 and bought != "USDT":
+            #SELL
+            bags["fiat"] = bags[bought] * big_df.loc[ind, f'{bought}USDT_avg']
+            #print(f'2. Sold {pair}: bag is now {bags["fiat"]}$ ')
+
+
+            td = {"date": [ind], "sign": [-1], "hyst": [big_df.loc[ind, f'{bought}USDT_MACDh_12_26_9']]}
+            store = pd.DataFrame(td)
+            store.set_index("date", inplace= True)
+            record[bought] = pd.concat([record[bought], store], axis=0 )
+
+            bags[bought] = 0
+            bought = False
+            q = round(stash[bought], rounding_order_crypro_amount[f'{bought}USDT'])
+            p = round(prices_dict[bought], rounding_order_price[f'{bought}USDT'])
+            sell(pair, q, p)
+
+
+        else:
+            pass
+
+                
+    if bags["fiat"] == 0 :
+        bags["fiat"] = bags[bought] * big_df.loc[ind, f'{bought}USDT_avg']
+        bags[bought] = 0
+
+    print( bags["fiat"] )
+
+
+
 
     fig = go.Figure()
     for p, df in c_dict.items():
         fig.add_trace(go.Scatter(x=c_dict[p].index, y=c_dict[p][f'{p}_MACDh_12_26_9'].values, mode='lines', name=p))
 
-
-process()
-schedule.every().hour.do(process)
-
-# Loop to keep the script running
-while True:
-    schedule.run_pending()
-    sleep(1)
+    fig.show() 
 
 #plt.plot(c_dict["BTCUSDT"].index, c_dict['BTCUSDT']["BTCUSDT_histogram"].values)
 

@@ -1,7 +1,7 @@
 from binance import Client
 import pandas as pd
 
-of_interest = ['BTC', 'ADA', 'MINA', "PAXG", "AGIX", "DOT", "AR", "LINK"]
+of_interest =  ["SOL", "PIXEL", "JUP", "WIF", "PYTH"]#['BTC', 'ADA', 'MINA', "PAXG", "AGIX", "DOT", "AR", "LINK"]
 
 def unlock (fname = 'nancy.txt'):
     with open(fname) as f:
@@ -31,7 +31,7 @@ if ind == 7:
         bars = cli.get_historical_klines(pair, candle, timestamp, limit=1000)
         #with open('./data/btc_2017d_bars.json', 'w') as f:
         #    json.dump(bars, f)
-        pth = f'./data/{period}/{pair}.csv'
+        pth = f'../data/{period}/{pair}.csv'
         with open(pth, 'w') as d:
             for line in bars:
                 d.write(f'{line[0]}, {line[1]}, {line[2]}, {line[3]}, {line[4]}\n')
