@@ -1,13 +1,12 @@
 #!/bin/python3
-
+import os 
 import numpy as np
 #import schedule
 from time import sleep
 import pandas as pd
 from binance.client import Client
-from binance import ThreadedWebsocketManager
+#from binance import ThreadedWebsocketManager
 from binance.exceptions import BinanceAPIException, BinanceOrderException
-import btalib as bl
 import math
 #from dash import dcc, html
 #from dash.dependencies import Input, Output
@@ -131,6 +130,13 @@ def floor_to_n_digit(value, n):
     floored_value = math.floor(scaled_value)
     return floored_value / 10**n
 
+def record_transaction(df_row):
+    file_path = "../data/trecord.csv"
+    if not os.path.isfile(file_path):
+        df_row.to_csv(file_path, mode = "w", header = True, incex = True)
+    else:
+        df_row.to_csv(file_path, mode = "a", header = True, incex = True)
+
 
 
 def sell( pair, q , price):
@@ -149,14 +155,21 @@ def sell( pair, q , price):
         print(f" Placing SELL {pair} order ...")
         #open_order = cli.get_open_orders(symbol = pair )
         while cli.get_open_orders(symbol = pair ):
-            #orderID = open_order[0]['orderId']
+            open_order = cli.get_open_orders(symbol = pair)
+            orderID = open_order[0]['orderId']
+            if c1 >= 40:
+                cli.cancel_order(symbol = pair, orderId = orderID)
+                cli.order_market_sell( symbol=pair,quantity=q)
+
             if c1 < 1 :
                 print("waiting for order to be filled ...")
                 c1 += 1
         
             else : 
                 c1 += 1
-                sleep(30)
+                sleep(15)
+
+    
 
         #print("DONE!")
 
@@ -185,6 +198,12 @@ def buy( pair, q , price):
         print(f'Placeing BUY order...')
         #open_order = cli.get_open_orders(symbol = pair )
         while cli.get_open_orders(symbol = pair ):
+            open_order = cli.get_open_orders(symbol = pair)
+            orderID = open_order[0]['orderId']
+            if c1 >= 40:
+                cli.cancel_order(symbol = pair, orderId = orderID)
+                cli.order_market_buy( symbol=pair,quantity=q)
+
             #orderID = open_order[0]['orderId']
             if c1 < 1 :
                 print("waiting for order to be filled ...")
@@ -243,8 +262,7 @@ def update_h_candles(pairs):
 def process():
     c_dict = update_h_candles(pairs)
     prices_dict = dict(zip(pairs, [get_price(pair) for pair in pairs]))
-    #buy = []
-    #sell = []
+
     record = {}
     for c in coins:
         record[c] = pd.DataFrame( columns = ["sign", 'hyst'])
@@ -273,12 +291,15 @@ def process():
         momentum =c_dict[p][f"{p}_momentum"].iloc[-1]
         pi =c_dict[p][f"{p}_avg"].iloc[0]
         pf = c_dict[p][f"{p}_avg"].iloc[-1]
+
         mm = round((pf - pi)/pi, 2 )     
+        
         print(f"{p}: {round(hist, 5)}: {round(momentum, 4)}, {round(pi,2)} --> {round(pf, 2)} | {mm}")
         market_dict[p] = (c_dict[p][f'{p}_avg'].iloc[-1] - c_dict[p][f'{p}_avg'].iloc[0] ) /c_dict[p][f'{p}_avg'].iloc[0]
     
     avg_mkt = sum(market_dict.values())/len(pairs)
     print(f"Average market move: {round(avg_mkt*100, 2)}" )
+    exit()
 
     latest_data = [df.iloc[-1, : ] for df in c_dict.values()]
 
@@ -358,40 +379,3 @@ def process():
     """
 
 process()
-"""
-schedule.every().hour.do(process)
-
-# Loop to keep the script running
-while True:
-    schedule.run_pending()
-    sleep(1)
-
-#plt.plot(c_dict["BTCUSDT"].index, c_dict['BTCUSDT']["BTCUSDT_histogram"].values)
-
-# Adding labels at the start of each line
-#for p  in pairs :
-#    plt.plot(c_dict[p].index, c_dict[p][f'{p}_histogram'].values, label = p)
-#    #plt.text(c_dict[p].index[0], c_dict[p][f'{p}_histogram'][0], p , fontsize=9, verticalalignment='bottom')
-
-# Additional plot formatting
-#plt.xlabel('time (h)')
-#plt.ylabel('macnd hyst')
-#plt.title('coins of interest')
-#plt.legend()
-#plt.show()
-
-
-stats_dict = {}
-for p in pairs:
-    data = c_dict[p].tail(33)[[f"{p}_high", f"{p}_low"]]
-    overall_mean = data.values.flatten().mean()
-    overall_std = data.values.flatten().std()
-    # mean and sd for overall highs and lows of the last 33 hours
-    stats_dict[p] = (overall_mean, overall_std)
-
-
-print(stats_dict["MINAUSDT"])
-
-
-
-"""
