@@ -87,7 +87,6 @@ def norm_augment(df):
     # Limit df to the last 1000 entries
     df.dropna(inplace=True)
     
-
     # Convert index to matplotlib date numbers if index is datetime
     if isinstance(df.index, pd.DatetimeIndex):
         x = np.array([date2num(d) for d in df.index])
@@ -98,10 +97,9 @@ def norm_augment(df):
     # Momentum calculation
     df['momentum'] = np.gradient(y, x)
 
-    # LOWESS smoothing
+    #LOWESS smoothing
     #lowess = sm.nonparametric.lowess(y, x, frac=0.019)
     #df['LOWESS'] = lowess[:, 1]
-
 
     return df
 
@@ -114,7 +112,7 @@ def update_pair (pair, timestamp):
     for bar in bars:
         # add each row to the dataframe
         df.loc[len(df.index)] = [float(x) for x in bar[0:5]]
-    df.set_index('date', inplace=True)
+    df.set_index('date', inplace=True)  
     df.index = pd.to_datetime(df.index, unit='ms')
     return df
 
@@ -136,7 +134,6 @@ def record_transaction(df_row):
         df_row.to_csv(file_path, mode = "w", header = True, incex = True)
     else:
         df_row.to_csv(file_path, mode = "a", header = True, incex = True)
-
 
 
 def sell( pair, q , price):
@@ -168,8 +165,6 @@ def sell( pair, q , price):
             else : 
                 c1 += 1
                 sleep(15)
-
-    
 
         #print("DONE!")
 
@@ -298,8 +293,7 @@ def process():
         market_dict[p] = (c_dict[p][f'{p}_avg'].iloc[-1] - c_dict[p][f'{p}_avg'].iloc[0] ) /c_dict[p][f'{p}_avg'].iloc[0]
     
     avg_mkt = sum(market_dict.values())/len(pairs)
-    print(f"Average market move: {round(avg_mkt*100, 2)}" )
-    exit()
+  
 
     latest_data = [df.iloc[-1, : ] for df in c_dict.values()]
 
@@ -330,21 +324,22 @@ def process():
         q = round ((stash["USDT"]-5)/prices_dict[pair], rounding_order_crypro_amount[pair])
         p = round(prices_dict[pair], rounding_order_price[pair])
         print(f'buying {q} of {pair} for {p}')
-        buy(pair, q, p)
+        #buy(pair, q, p)
+
 
     elif vector < 0 and not usdt:
         #SELL
         pair = f'{bought}USDT'
         q = floor_to_n_digit(stash[bought], rounding_order_crypro_amount[f'{bought}USDT'])
         p = round(prices_dict[f"{bought}USDT"], rounding_order_price[f'{bought}USDT'])
-        sell(pair, q, p)
+        #sell(pair, q, p)
         print(pair, p, q )
-        print(f"SOLD {pair}")
+        print(f"SOLD {q} {pair} FOR {p}")
     
     elif not usdt and  momentae.loc[f'{bought}USDT_momentum'] < 0 :
         # FLIPP
         pair, q, p = pqp(bought)
-        sell(pair, q, p)
+        #sell(pair, q, p)
 
         stash["USDT"] = float(cli.get_asset_balance("USDT")["free"])
 
@@ -352,22 +347,23 @@ def process():
         q = round ((stash["USDT"]-5)/prices_dict[pair], rounding_order_crypro_amount[pair])
         p = round(prices_dict[pair], rounding_order_price[pair])
         print(f'buying {q} of {pair} for {p}')
-        buy(pair, q, p)
+        #buy(pair, q, p)
         print(f"Flipped {bought} for {pair}")
     
     elif bought == "PAXG" and bought not in pair :
         sell_pair, q, p = pqp(bought)
-        sell(sell_pair, q, p)
+        #sell(sell_pair, q, p)
 
         stash["USDT"] = float(cli.get_asset_balance("USDT")["free"])
         
         q = round ((stash["USDT"]-5)/prices_dict[pair], rounding_order_crypro_amount[pair])
         p = round(prices_dict[pair], rounding_order_price[pair])
         print(f'buying {q} of {pair} for {p}')
-        buy(pair, q, p)
+        #buy(pair, q, p)
         print(f"Flipped {bought} for {pair}")
 
     else:
+        print("NOthing to report")
         pass
     """
 

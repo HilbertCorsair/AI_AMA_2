@@ -177,7 +177,7 @@ def defend (pair, stop_level, price):
 def monitor(pair, stop_loss_price, acion_price):
     cli = unlock()
     price = get_price(pair)
-    active = True if cli.get_open_orders(symbol = pair) else False
+    active = True if cli.get_open_orders(symbol = pair) else False        
 
     while not active : 
 
@@ -189,6 +189,27 @@ def monitor(pair, stop_loss_price, acion_price):
             print(price)
             sleep(60*3)
 
-monitor("MINAUSDT", 0.9693, 1.009)            
-defend("MINAUSDT", 0.9283, 0.9501)
+def check_take_profit (pair, limit):
+    cli = unlock()
+    active = True if cli.get_open_orders(symbol = pair) else False 
+    while active:
+        latest_price = cli.get_symbol_ticker(symbol = pair)
+        price = float(latest_price['price'])
+        if price <= limit:
+            oid = cli.get_open_orders(symbol = pair)[0]["orderId"]
+            cli.cancel_order(
+                symbol = pair,
+                orderId = str(oid))
+            print("canceled order")
+            sell(pair, 2.93, limit)
+        else:
+            print(price)
+            sleep(180)
+
+
+#monitor("MINAUSDT", 0.9693, 1.009)            
+#defend("MINAUSDT", 0.9283, 0.9501)
+check_take_profit("PAXGBTC", 0.04120)           
 print("Defense protocole executed ! ")
+
+

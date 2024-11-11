@@ -36,6 +36,29 @@ class Ops (C):
             "top_price_f": 0.8974
             }
 
+        self.pairs = self.get_pairs()
+        self.balance = [self.cli.get_asset_balance(c)for c in self._of_interest + ["USDC", "USDT"]]
+        self.stash = dict(zip(self._of_interest + ["USDC", "USDT"], [float(d["free"]) for d in self.balance if d["asset"] in self._of_interest + ["USDC", "USDT"]]))
+        self.prices_dict = dict(zip(self.pairs, [self.get_price(pair) for pair in self.pairs]))
+        self.valuations = self.update_valuations()
+        self.bought = self.valuations.idxmax()
+        self.usdc = self.bought in ["USDC", "USDT"]
+
+    def get_pairs(self):
+        pairs = [f'{c}USDT' for c in self._of_interest]
+        return pairs
+    
+    def update_valuations(self):
+        valuations = {}
+        for k, val in self.prices_dict.items():
+            coin = [c for c in self._of_interest if c in k][0]
+            valuations[coin] = val * self.stash[coin]
+        valuations["USDC"] = self.stash["USDC"]
+        valuations['USDT'] = self.stash["USDT"]
+        valuations = pd.Series(valuations)
+        return valuations
+        
+
 
     def unlock (self, fname = 'nancy.txt'):
         """Returns the Binance Client"""

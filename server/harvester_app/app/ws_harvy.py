@@ -6,8 +6,14 @@ from binance.exceptions import BinanceAPIException, BinanceOrderException
 from matplotlib.dates import date2num
 import math
 
-class TradeBot (Ops):
-    def __init__(self):
+class GridTradeBot (Ops):
+    """
+    Takes a pair and 2 sets of linear coordonates and sets buy and sell orders
+    when the price hits the set targets
+    """
+    def __init__(self, pair):
+        self._pair = pair
+
         super().__init__()
         self.switch = False # False for not holding crypto (waiting to buy)
         self.problem = False
@@ -35,6 +41,12 @@ class TradeBot (Ops):
     def flip (self, bol):
          return not bol
     
+    @property
+    def pair(self):
+        return self._pair
+    
+
+    
     #def record_transaction():
          
        
@@ -52,28 +64,33 @@ class TradeBot (Ops):
             return support_slope, top_slope
 
 
-    def live_trade_pair(self, pair="MINAUSDT"):
+    def live_trade_pair(self):
 
             bs , ts = self.get_grid_slopes()
 
             bsm = ThreadedWebsocketManager()
             bsm.start()
-            bsm.start_symbol_ticker_socket(symbol=pair, callback= self.pairs_trade)
-            while not self.live_price[pair]:
+            bsm.start_symbol_ticker_socket(symbol=self.pair, callback= self.pairs_trade)
+            while not self.live_price[self.pair]:
                 sleep(0.1)
+                if self.live_price["error"]:
+                    bsm.stop()
+                    sleep(3)
+                    bsm.start_symbol_ticker_socket(symbol=self.pair, callback= self.pairs_trade)
+
 
             while True:
                 
                 if self.live_price['error']:
                     bsm.stop()
-                    sleep(3)
-                    bsm = ThreadedWebsocketManager()
-                    bsm.start()
-                    bsm.start_symbol_ticker_socket(symbol=pair, callback= self.pairs_trade)
-                    self.live_price["error"] = False
+                    #sleep(3)
+                    #bsm = ThreadedWebsocketManager()
+                    #bsm.start()
+                    #bsm.start_symbol_ticker_socket(symbol=self.pair, callback= self.pairs_trade)
+                    #self.live_price["error"] = False
 
                 else:
-                    print(self.live_price[pair])
+                    print(self.live_price[self.pair])
                     current_timestamp = datetime.datetime.now().timestamp()
                     stop_loss = (current_timestamp - self.grid_params['support_date_i'].timestamp()) * bs + self.grid_params["support_price_i"]
                     stop_loss = round(stop_loss, 4)
@@ -84,7 +101,7 @@ class TradeBot (Ops):
 
                     if self.switch:
                                              
-                        if self.live_price[pair] <= stop_loss :#or self.live_price[pair] >= take_profit:
+                        if self.live_price[self.pair] <= stop_loss :#or self.live_price[pair] >= take_profit:
                             try :
                                 balance = self.cli.get_asset_balance(asset='USDT')
                                 balance = float(balance["free"])
@@ -95,8 +112,8 @@ class TradeBot (Ops):
                                     self.problem = self.flip(self.problem)
                                     break
 
-                                q = math.floor(balance/self.live_price[pair]) - 5
-                                self.place_spot_order("BUY", pair, q , self.live_price[pair])
+                                q = math.floor(balance/self.live_price[self.pair]) - 5
+                                self.place_spot_order("BUY", self.pair, q , self.live_price[self.pair])
 
 
                                 self.switch = self.flip(self.switch)
@@ -111,21 +128,22 @@ class TradeBot (Ops):
                             print("Price within range: waiting for buy signal ... ")
                     else:
                          
-                        if self.live_price[pair] < stop_loss :
+                        if self.live_price[self.pair] < stop_loss :
                             rounding_order_price, rounding_order_crypro_amount = self.get_roundings()
                             try :
-                                balance = self.cli.get_asset_balance(asset='MINA')
+                                asset = self.pair.replace("USDT", "")
+                                balance = self.cli.get_asset_balance(asset=asset)
                                 balance = float(balance["free"])
-                                q = self.floor_to_n_digit(balance, rounding_order_crypro_amount[pair])
-                                if self.live_price[pair] * q <= 10:
+                                q = self.floor_to_n_digit(balance, rounding_order_crypro_amount[self.pair])
+                                if self.live_price[self.pair] * q <= 10:
                                     bsm.stop()
                                     print("No asset!")
                                     self.problem = self.flip(self.problem)
                                     break
 
-                                p = self.floor_to_n_digit(self.live_price[pair], rounding_order_price[pair]) 
+                                p = self.floor_to_n_digit(self.live_price[self.pair], rounding_order_price[self.pair]) 
 
-                                self.place_spot_order("SELL", pair, q , p)
+                                self.place_spot_order("SELL", self.pair, q , p)
                                 self.switch = self.flip(self.switch)
                                 print("Just sold")
 
