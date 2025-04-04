@@ -3,26 +3,48 @@ from operations import Ops
 from buffer import RollingBufferMixin
 import datetime
 from time import sleep
-from binance.exceptions import BinanceAPIException, BinanceOrderException
 from matplotlib.dates import date2num
-import math
 import pandas as  pd
-import pickle
 from collections import deque
+from datetime import datetime
+import numpy as np
+from sklearn.linear_model import LinearRegression
 
 class PriceTracker(Ops, RollingBufferMixin):
-    def __init__(self, pair, prc_distance = 0.027, momentum = 1, update_frq = 15):
+    def __init__(self, pair,di1, df1, pi1, pf1, di2, df2, pi2, pf2, prc_distance = 0.027, momentum = 1, update_frq = 15):
+        
+        self.Xs = np.array([[datetime.strptime(di1, "%Y-%m-%d %H:%M:%S").timestamp()], 
+                            [datetime.strptime(df1, "%Y-%m-%d %H:%M:%S").timestamp()]])  # 2x1 array
+        self.ys = np.array([pi1, pf1]).reshape(-1,1)
+
+        # Resistance model data
+        self.Xr = np.array([[datetime.strptime(di2, "%Y-%m-%d %H:%M:%S").timestamp()],
+                            [datetime.strptime(df2, "%Y-%m-%d %H:%M:%S").timestamp()]])  # 2x1 array
+        self.yr = np.array([pi2, pf2]).reshape(-1,1)
+
+        self.support_model = LinearRegression()
+        self.resistence_model = LinearRegression()
+
+        self.support_model.fit(X=self.Xs, y=self.ys)
+        self.resistence_model.fit(X=self.Xr, y=self.yr)
+
+        self.transations = {"type" : [],
+                            "date" : [],
+                            "pair" : [],
+                            "price": [],
+                            "quantity": []
+                            }
         super().__init__()
         self._update_frq = update_frq # time interval between price checks
         self.buffer = deque(maxlen=300)
         self._pair = pair
-        self._target = 0.56 #target_price # must start with an a initial price target
+        self._target = 0.3587 #target_price # must start with an a initial price target
         self._prc_distance = prc_distance # a % val that will set the target price
         #self._counter = 0 # number of times the price reaches or passes the target
         self.last_price = 0 
         #self.price_change = 0 # last proice change 
         #self.live_price = {self.pair: None, "error": False} 
-        self.twm = ThreadedWebsocketManager()
+        #self.twm = ThreadedWebsocketManager()
         self.order_placed = False  # Added this flag
         self.current_price = None # latest price recived from the socket
         self._momentum = momentum # direction in which the price is being tracked
@@ -31,8 +53,58 @@ class PriceTracker(Ops, RollingBufferMixin):
         self.mock_usd = 100
         self.mock_mina = 0
         self.up = None
+        self._trigger = False
+        self._current_timestamp = None
+        self._buy_threshold = None
+        self._take_profit = None
 
+    
+    @property
+    def trigger(self):
+        return self._trigger
+    @trigger.setter
+    def trigger(self, val):
+        self._trigger = val
 
+    def activate (self):
+        self.trigger = True
+
+    def deactivate (self):
+        self.trigger = False
+
+    @property
+    def current_timestamp(self):
+        """Get the current timestamp."""
+        return self._current_timestamp
+
+    @current_timestamp.setter
+    def current_timestamp(self, value):
+        """Set the current timestamp."""
+        self._current_timestamp = value
+
+    @property
+    def buy_threshold(self):
+        """Get the buy threshold value."""
+        return self._buy_threshold
+
+    @buy_threshold.setter
+    def buy_threshold(self, value):
+        """Set the buy threshold value."""
+        if not isinstance(value, (int, float)) and value is not None:
+            raise ValueError("Buy threshold must be a number or None")
+        self._buy_threshold = value
+
+    @property
+    def take_profit(self):
+        """Get the take profit value."""
+        return self._take_profit
+
+    @take_profit.setter
+    def take_profit(self, value):
+        """Set the take profit value."""
+        if not isinstance(value, (int, float)) and value is not None:
+            raise ValueError("Take profit must be a number or None")
+        self._take_profit = value
 
     @property
     def update_frq (self):
@@ -90,11 +162,18 @@ class PriceTracker(Ops, RollingBufferMixin):
     @prc_distance.setter
     def prc_distance(self, new_prc_distance):
         self._prc_distance = new_prc_distance
+
+    def calculate_prices(self, current_timestamp):
+        current_timestamp = np.array(current_timestamp).reshape(-1, 1 )
+        top_price= self.floor_to_n_digit(self.resistence_model.predict(current_timestamp), 4)
+        bottom_price = self.floor_to_n_digit(self.support_model.predict(current_timestamp), 4)
+        
+        return bottom_price, top_price
     
     def mock_buy(self, q):
         ts = datetime.time()
         self.mock_mina = self.mock_usd / self.target
-        self.mock_usd = 0
+        self.mock_usd = False
         self.mock_transations["stamp"].append(ts)
         self.mock_transations["side"].append("buy")
         self.mock_transations["price"].append(self.target)
@@ -121,49 +200,164 @@ class PriceTracker(Ops, RollingBufferMixin):
         while self.cli.get_open_orders(symbol = self.pair ):
             print("Waiting fror order to fill ... ")
             sleep(15)
+    
+    def move_target (self):
+        if self.up:
+            #sets SELL target slightly under the last local high
+            self.target =  self.record_price - (self.record_price * self.prc_distance)
+        else:
+            # Sets BUY target slightly above the last local low
+            self.target = self.record_price + (self.record_price * self.prc_distance)
 
-    def handle_ticker(self, msg):
-        # Callback method Method that handles the tracking and logic. 
+    def activate_alt_btc_tracking(self, msg):
+        """Target value must be set prior to calling this method
+        Tracks the price evolution realtive to a target price.
+        Buys, Sells, Updates target or Pass
+        """
 
         if msg['e'] == '24hrTicker':
-            self.current_price = self.floor_to_n_digit(float(msg['c']), 4 )
-            self.up = self.bought not in ["USDT", "USDC"]
+            self.current_price = float(msg['c'])
+            self.up = self.bought != "BTC" 
+            print(f"Current MINA-BTC price --> {self.current_price}")
+        
+        # pulls the trigger
+            c1 = not self.trigger
+            c2 = self.up and self.current_price >= self.target # activates when looking to sell
+            c3 = not self.up and self.current_price <= self.target # activates wlen looking to buy 
 
-
-            print(f'Target --> {round(self.target, 4)}\nPRICE --> {self.current_price}\n\n')
-            self.check_oo()
-
-            # updating record price : 3 scenarios 
-            if not self.record_price or (
-                self.up and self.current_price > self.record_price
-                ) or (
-                    not self.up and self.current_price < self.record_price
-                    ):
-                self.record_price = self.current_price
-                print(f"Updated trigger to {self.record_price}")
-            
-            self.target = self.record_price - (self.record_price * self.prc_distance) if self.up else self.record_price + (self.record_price * self.prc_distance)
-            
-
+        if c1 and (c2 or c3):
+            self.activate()
+            self.move_target()
+        # starts price trackikg if reigger is activated
+        if self.trigger :
+            print ("Looking to SELL") if self.up else print("Looking to BUY") 
+            #SELL for BTC
             if self.up and self.current_price <= self.target:
-                q = self.floor_to_n_digit(self.stash[self.bought], self.get_roundings()[1][self.pair])
+                q = self.floor_to_n_digit(self.stash[self.bought], 1)
+               
+                self.place_spot_order("SELL", self.pair, q, self.target)
+                self.target = None
+                self.record_price = None
+                self.deactivate()
+                print(f"Just sold {q}, {self.pair}, at {self.current_price}")
+            
+            #BUY alt
+            elif not self.up and self.current_price >= self.target:
+                q = self.floor_to_n_digit(self.stash["BTC"]/self.target, 1)
+                self.place_spot_order("BUY", self.pair, q, self.target)
+                print(f"Bought {q} MINA")
+                self.target= None
+                self.record_price = None
+                self.deactivate()
+            
+            #update record price and target
+            elif self.up and self.current_price > self.record_price or not self.up and self.current_price < self.record_price:
+                self.record_price = self.current_price
+                self.move_target()
+                print(f"New target is {self.target}")
+
+    def look_to_buy(self, msg): 
+        if msg['e'] == '24hrTicker':
+            self.current_price = self.floor_to_n_digit(float(msg['c']), 4 )
+            if not self.record_price:
+                self.record_price = self.current_price
+                self.target = self.floor_to_n_digit(self.record_price + (self.record_price * self.prc_distance), 4)
+            elif self.current_price > self.target: 
+                q = self.floor_to_n_digit(self.stash["USDT"]/self.target, 1)
+                price = self.target
+                self.place_spot_order("BUY", self.pair, q, price)
+                print(f"Bought {q} {self.pair}")
+                self.target= None
+                self.record_price = None
+            elif self.current_price < self.record_price:
+                self.record_price = self.current_price
+
+                self.target = self.floor_to_n_digit(self.record_price + (self.record_price * self.prc_distance),4)
+                print(f"Target moved to: {self.target}")
+
+    def look_to_sell(self, msg): 
+        
+        if msg['e'] == '24hrTicker':
+            self.current_price = self.floor_to_n_digit(float(msg['c']), 4 )
+            if not self.record_price:
+                self.record_price = self.current_price
+                self.target = self.floor_to_n_digit(self.record_price - (self.record_price * self.prc_distance), 4)
+            elif self.current_price < self.target: 
+                q = self.floor_to_n_digit(self.stash[self.bought], 1)
                 price = self.floor_to_n_digit(self.target, 4)
                 self.place_spot_order("SELL", self.pair, q, price)
                 self.target = None
                 self.record_price = None
                 print(f"Just sold {q}, {self.pair}, at {self.current_price}")
+            elif self.current_price > self.record_price:
+                self.record_price = self.current_price
+                self.target = self.floor_to_n_digit(self.record_price + (self.record_price * self.prc_distance),4)
+                print(f"Target moved to: {self.target}")
+
+
+    def handle_ticker(self, msg = None):
+        # Callback method Method that handles the tracking and logic. 
+
+        if not msg :
+            pass
+
+        if msg['e'] == '24hrTicker':
+            self.current_price = self.floor_to_n_digit(float(msg['c']), 4 )
+            self.up = self.bought not in ["USDT", "USDC"]
+
+        # Calculate top and bottom prices from grid slopes
+            print(f"Current  price {self.current_price} USD")
+            self.current_timestamp = datetime.now().timestamp()
+            self.buy_threshold, self.take_profit = self.calculate_prices(self.current_timestamp)
+            print(f'Activated: {self.trigger}\nactive between {self.buy_threshold} and {self.take_profit}\nGoing UP - {self.up}\n')
+            self.check_oo()
+
+            c1 = not self.trigger
+            c2 = self.up and self.current_price >= self.take_profit # activates when looking to sell
+            c3 = not self.up and self.current_price <= self.buy_threshold # activates wlen looking to buy 
+            
+            #When the price moves outside the interval start tracking for buy of sell oporunity
+            #to be continued
+            if c1 and (c2 or c3):
+                self.activate()
+                self.record_price = self.current_price
+                self.move_target()
+                print(f"Target designated {self.record_price}")
+
+            #move target
+            elif c1:
+                pass
+
+            elif (self.up and self.current_price > self.record_price) or not self.up and self.current_price < self.record_price:
+                self.record_price = self.current_price
+                self.move_target()
+                print(f'Updated target to {self.target}')
+                        
+
+            elif self.up and self.current_price <= self.target:
+                q = self.floor_to_n_digit(self.stash[self.bought], 1)
+                price = self.floor_to_n_digit(self.target, 4)
+                self.place_spot_order("SELL", self.pair, q, price)
+                self.target = None
+                self.record_price = None
+                print(f"Just sold {q}, {self.pair}, at {self.current_price}")
+                self.deactivate()
 
 
             elif not self.up and self.current_price >= self.target:
-                q = self.floor_to_n_digit(self.stash["USDT"]/self.target, self.get_roundings[1][self.pair])
+                q = self.floor_to_n_digit(self.stash["USDT"]/self.target, 1)
                 price = round(self.target, 4)
                 self.place_spot_order("BUY", self.pair, q, price)
+                print(f"Bought {q} {self.pair}")
                 self.target= None
                 self.record_price = None
-                print("price is rizing I should buy")
-            print (self.record_price)
-
+                self.deactivate()
+                
             sleep(1)
+        else:
+            print(f"Current prce {self.current_price} within range, activation at {self.take_profit}:  Monitoring ...  ")
+            sleep(1)
+        
 
     def fw_test(self, msg):
 
@@ -198,10 +392,10 @@ class PriceTracker(Ops, RollingBufferMixin):
             self.target = round(self.record_price - (self.record_price * 0.01) if self.mock_usd==0 else self.record_price + (self.record_price * 0.01), 4)
             print (f"New target is {self.target}")
 
-            #Looking toi sell
+            #Looking to sell
             if self.mock_usd == 0 and self.current_price <= self.target :
                 print(f"Looking to sell {self.bought}")
-                q = self.floor_to_n_digit(self.mock_mina, self.get_roundings()[1]["MINAUSDT"])
+                q = self.floor_to_n_digit(self.mock_mina, self.get_roundings()[1][self.pair])
                 self.mock_sell(q)
                 self.target = None
                 self.record_price = None
@@ -210,7 +404,7 @@ class PriceTracker(Ops, RollingBufferMixin):
 
             #Looking to BUY 
             elif self.mock_mina == 0 and self.current_price >= self.target:
-                q = self.floor_to_n_digit(self.mock_usd/self.target, self.get_roundings()[1]["MINAUSDT"])
+                q = self.floor_to_n_digit(self.mock_usd/self.target, self.get_roundings()[1][self.pair])
                 self.mock_buy(q)
                 print(f"Bought {q}, {self.target} for {self.target}")
                 self.target = None
@@ -219,41 +413,88 @@ class PriceTracker(Ops, RollingBufferMixin):
 
             sleep(1)
 
-            """ 
-
-
-            if (self.current_price <= self.target) and not self.order_placed:
-                self.counter +=1  
-
-                if self.counter >= 3:
-                    print('I will place a sell order')
-                    # Implement your buy order logic here
-                    self.order_placed = True
-                    self.counter = 0
-                    self.momentum = -1
-                else:
-                    print (f"Counter at {self.counter}, still monitorint ")
-                    print(self.current_price)
-                    print(self.prc_distance)
-
-            else:
-                # This updates teh limit price only if last price is higher than previous price 
-                if self.current_price > self.last_price :  
-                    self.target = self.current_price - (self.current_price * self.prc_distance * self.update_frq)
-                    self.target = self.floor_to_n_digit(self.target, 4)
-
-                    print(f"updatig ... price is {self.current_price} ")
-                    print("Holding: ", self.bought)
-                    exit()
-                sleep(15)
-                """
-        
-
-
     def start_trading(self):
-        self.twm.start()
-        self.twm.start_symbol_ticker_socket(callback=self.handle_ticker, symbol=self.pair)
-        print(f"Monitoring {self.pair} price. Target: {self.target}")
+        #self.twm.start()
+        #self.twm.start_symbol_ticker_socket(callback=self.handle_ticker, symbol=self.pair)
+        print(f"Monitoring {self.pair} target at {self.take_profit} or {self.buy_threshold} up >> {self.up}, acttivated : {self.trigger}")
+
+    def api_calls(self):
+        #c = 0
+        while True :
+            try:
+                tick = self.cli.get_symbol_ticker(symbol="ADAUSDT")
+                self.current_price = round(float(tick['price']), 4)
+
+            except:
+                self.current_price = None
+
+            if not self.current_price:
+                while not self.current_price:
+                    print("Trying to fetch the price")
+
+                    tick = self.cli.get_symbol_ticker(symbol= self.pair)
+                    self.current_price = round(float(tick['price']), 4)
+            else : 
+
+            
+                self.up = self.bought not in ["USDT", "USDC"]
+
+            # Calculate top and bottom prices from grid slopes
+                print(f"Current  price {self.current_price} USD")
+                self.current_timestamp = datetime.now().timestamp()
+                self.buy_threshold, self.take_profit = self.calculate_prices(self.current_timestamp)
+                print(f'Activated: {self.trigger}\nactive between {self.buy_threshold} and {self.take_profit}\nGoing UP - {self.up}\n')
+                self.check_oo()
+
+                c1 = not self.trigger
+                c2 = self.up and self.current_price >= self.take_profit # activates when looking to sell
+                c3 = not self.up and self.current_price <= self.buy_threshold # activates wlen looking to buy 
+                
+                #When the price moves outside the interval start tracking for buy of sell oporunity
+                #to be continued
+                if c1 and (c2 or c3):
+                    self.activate()
+                    self.record_price = self.current_price
+                    self.move_target()
+                    print(f"Target designated {self.record_price}")
+
+                #move target
+                elif c1:
+                    pass
+
+                elif (self.up and self.current_price > self.record_price) or not self.up and self.current_price < self.record_price:
+                    self.record_price = self.current_price
+                    self.move_target()
+                    print(f'Updated target to {self.target}')
+                            
+
+                elif self.up and self.current_price <= self.target:
+                    q = self.floor_to_n_digit(self.stash[self.bought], 1)
+                    price = self.floor_to_n_digit(self.target, 4)
+                    self.place_spot_order("SELL", self.pair, q, price)
+                    self.target = None
+                    self.record_price = None
+                    print(f"Just sold {q}, {self.pair}, at {self.current_price}")
+                    self.deactivate()
+
+
+                elif not self.up and self.current_price >= self.target:
+                    q = self.floor_to_n_digit(self.stash["USDT"]/self.target, 1)
+                    price = round(self.target, 4)
+                    self.place_spot_order("BUY", self.pair, q, price)
+                    print(f"Bought {q} {self.pair}")
+                    self.target= None
+                    self.record_price = None
+                    self.deactivate()
+                    
+                    sleep(1)
+                else:
+                    print(f"Current prce {self.current_price} within range, activation at {self.take_profit}:  Monitoring ...  ")
+                    sleep(1)
+            sleep(7)
+
+
+
 
 
     def stop_trading(self):
@@ -261,10 +502,22 @@ class PriceTracker(Ops, RollingBufferMixin):
         print("Trading stopped.")
 
 def main():
-    tracker = PriceTracker(pair="MINAUSDT", prc_distance= 0.0085)
-    tracker.start_trading()
+    tracker = PriceTracker(pair="ADAUSDT",
+                           di1="2025-03-10 10:00:00",
+                           df1="2025-03-16 19:00:00",
+                           pi1=0.6607,
+                           pf1=0.7495,
+                           di2="2025-03-10 10:00:00",
+                           df2="2025-03-16 13:00:00",
+                           pi2=0.6872,
+                           pf2=0.7736,
+                           prc_distance= 0.0085)
+    #tracker.target = 0.00000361
 
-    try:
+    #tracker.start_trading()
+    tracker.api_calls()
+
+    """try:
         while True:
             sleep(1)
     except KeyboardInterrupt:
@@ -273,7 +526,7 @@ def main():
         print(tracker.mock_usd, tracker.mock_mina)
 
     finally:
-        tracker.stop_trading()
+        tracker.stop_trading()"""
 
 if __name__ == "__main__":
     main()

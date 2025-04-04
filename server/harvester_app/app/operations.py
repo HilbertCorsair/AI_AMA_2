@@ -23,7 +23,7 @@ class Ops (C):
         self.csv_files = "/home/honeybadger/projects/harvester/data/h"
         self.live_price = {"MINAUSDT": None, "error": False}
         self.cli = self.unlock()
-
+        """
         self.grid_params = {
             "support_date_i" : datetime.datetime.strptime("2024-05-14 14:00:00", "%Y-%m-%d %H:%M:%S"),
             "support_date_f": datetime.datetime.strptime("2024-06-02 10:00:00", "%Y-%m-%d %H:%M:%S"),
@@ -35,7 +35,7 @@ class Ops (C):
             "top_price_i": 0.7769,
             "top_price_f": 0.8974
             }
-
+        """
         self.pairs = self.get_pairs()
         self.balance = [self.cli.get_asset_balance(c)for c in self._of_interest + ["USDC", "USDT"]]
         self.stash = dict(zip(self._of_interest + ["USDC", "USDT"], [float(d["free"]) for d in self.balance if d["asset"] in self._of_interest + ["USDC", "USDT"]]))
@@ -66,7 +66,7 @@ class Ops (C):
             lines = f.readlines()
         a = lines[0].splitlines()[0]
         b = lines[1]
-        return Client(a , b)
+        return Client(a , b, requests_params={"timeout": 300})
     
     def get_price(self, pair):
         cli = self.unlock()

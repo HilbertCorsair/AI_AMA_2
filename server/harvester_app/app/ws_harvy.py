@@ -11,8 +11,19 @@ class GridTradeBot (Ops):
     Takes a pair and 2 sets of linear coordonates and sets buy and sell orders
     when the price hits the set targets
     """
-    def __init__(self, pair):
+    def __init__(self, pair, di1, df1, pi1, pf1, di2, df2, pi2, pf2 ):
         self._pair = pair
+        self.grid_params= {
+            "support_date_i" : datetime.datetime.strptime(di1, "%Y-%m-%d %H:%M:%S"),
+            "support_date_f": datetime.datetime.strptime(df1, "%Y-%m-%d %H:%M:%S"),
+            "support_price_i": pi1,
+            "support_price_f": pf1,
+
+            "top_date_i":datetime.datetime.strptime(di2 ,"%Y-%m-%d %H:%M:%S"),
+            "top_date_f": datetime.datetime.strptime(df2, "%Y-%m-%d %H:%M:%S"),
+            "top_price_i": pi2,
+            "top_price_f": pf2            
+        }
 
         super().__init__()
         self.switch = False # False for not holding crypto (waiting to buy)
@@ -26,7 +37,7 @@ class GridTradeBot (Ops):
 
         self.live_price = {"MINAUSDT": None, "error": False}
         self.cli = self.unlock()
-
+        """
         self.grid_params = {
             "support_date_i" : datetime.datetime.strptime("2024-05-15 02:00:00", "%Y-%m-%d %H:%M:%S"),
             "support_date_f": datetime.datetime.strptime("2024-06-12 10:00:00", "%Y-%m-%d %H:%M:%S"),
@@ -38,6 +49,7 @@ class GridTradeBot (Ops):
             "top_price_i": 0.8662,
             "top_price_f": 0.8833
             }
+        """
     def flip (self, bol):
          return not bol
     
