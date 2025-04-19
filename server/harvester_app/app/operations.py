@@ -21,43 +21,67 @@ class Ops (C):
         self.rop , self.rca = self.get_roundings()
         self.pkl_files = "/home/honeybadger/projects/harvester/data/h/pkls"
         self.csv_files = "/home/honeybadger/projects/harvester/data/h"
+        self.tr_record_pth = "../data/transactions.pkl"
         self.live_price = {"MINAUSDT": None, "error": False}
         self.cli = self.unlock()
-        """
-        self.grid_params = {
-            "support_date_i" : datetime.datetime.strptime("2024-05-14 14:00:00", "%Y-%m-%d %H:%M:%S"),
-            "support_date_f": datetime.datetime.strptime("2024-06-02 10:00:00", "%Y-%m-%d %H:%M:%S"),
-            "support_price_i": 0.7219,
-            "support_price_f": 0.8243,
-
-            "top_date_i":datetime.datetime.strptime("2024-05-09 22:00:00" ,"%Y-%m-%d %H:%M:%S"),
-            "top_date_f": datetime.datetime.strptime("2024-05-31 20:00:00", "%Y-%m-%d %H:%M:%S"),
-            "top_price_i": 0.7769,
-            "top_price_f": 0.8974
-            }
-        """
         self.pairs = self.get_pairs()
-        self.balance = [self.cli.get_asset_balance(c)for c in self._of_interest + ["USDC", "USDT"]]
-        self.stash = dict(zip(self._of_interest + ["USDC", "USDT"], [float(d["free"]) for d in self.balance if d["asset"] in self._of_interest + ["USDC", "USDT"]]))
+        self.balance = [self.cli.get_asset_balance(c)for c in self._of_interest + ["USDC"]]
+        self.stash = dict(zip(self._of_interest + ["USDC"], [float(d["free"]) for d in self.balance if d["asset"] in self._of_interest + ["USDC"]]))
         self.prices_dict = dict(zip(self.pairs, [self.get_price(pair) for pair in self.pairs]))
         self.valuations = self.update_valuations()
         self.bought = self.valuations.idxmax()
-        self.usdc = self.bought in ["USDC", "USDT"]
+        self.usdc = self.bought =="USDC"
+
 
     def get_pairs(self):
-        pairs = [f'{c}USDT' for c in self._of_interest]
+        pairs = [f'{c}USDC' for c in self._of_interest]
         return pairs
-    
+
     def update_valuations(self):
         valuations = {}
         for k, val in self.prices_dict.items():
             coin = [c for c in self._of_interest if c in k][0]
-            valuations[coin] = val * self.stash[coin]
+            valuations[coin] = 0 if not val else val * self.stash[coin]
         valuations["USDC"] = self.stash["USDC"]
-        valuations['USDT'] = self.stash["USDT"]
         valuations = pd.Series(valuations)
         return valuations
-        
+
+    def update_transactions_record(self, tr_dict):
+        """
+        Append a dictionary as a row to a pandas DataFrame stored in a pickle file.
+        If the file doesn't exist, create it with the dictionary as the first row.
+        Parameters:
+        -----------
+        data_dict : dict
+            Dictionary to append as a row to the DataFrame
+        pickle_path : str
+            Path to the pickle file
+        Returns:
+        --------
+        None
+        """
+        # Create a DataFrame from the dictionary (single row)
+        tr_df = pd.DataFrame([tr_dict])
+        # Check if the pickle file exists
+        if os.path.exists(self.tr_record_pth):
+            try:
+                # Read existing DataFrame from pickle
+                existing_df = pd.read_pickle(self.tr_record_pth)
+                # Append the new row to the existing DataFrame
+                combined_df = pd.concat([existing_df, tr_df], ignore_index=True)
+                # Save the combined DataFrame back to the pickle file
+                combined_df.to_pickle(self.tr_record_pth)
+                print(f"Successfully appended data to existing pickle file: {self.tr_record_pth}")
+            except Exception as e:
+                print(f"Error appending to pickle file: {e}")
+        else:
+            try:
+                # Create a new pickle file with the DataFrame
+                tr_df.to_pickle(self.tr_record_pth)
+                print(f"Successfully created new pickle file: {self.tr_record_pth}")
+            except Exception as e:
+                print(f"Error creating pickle file: {e}")
+
 
 
     def unlock (self, fname = 'nancy.txt'):
@@ -67,19 +91,20 @@ class Ops (C):
         a = lines[0].splitlines()[0]
         b = lines[1]
         return Client(a , b, requests_params={"timeout": 300})
-    
+
     def get_price(self, pair):
         cli = self.unlock()
 
         if not pair in self.get_pairs():
             raise ValueError(f"> Available pairs are : \n{self.get_pairs()}\nYou provided {pair}\n")
-        
-        # this gets the last traded price (no info on tranzaction type)
-        latest_price = cli.get_symbol_ticker(symbol = pair)
-        price = float(latest_price['price'])
 
-        if pair in self.get_pairs():
-            price = round(price, self.rop[pair])
+        # this gets the last traded price (no info on tranzaction type)
+        try:
+            latest_price = cli.get_symbol_ticker(symbol = pair)
+            price = self.floor_to_n_digit( float(latest_price['price']), self.rop[pair])
+        except:
+            price = None
+
 
         return price
 
@@ -87,7 +112,7 @@ class Ops (C):
         scaled_value = value * 10**n
         floored_value = math.floor(scaled_value)
         return floored_value / 10**n
-    
+
     def import_coin_data(self, p, from_pkl = True):
         """ import coin pair data from pkl files by default or from csv files
         - p is a coin pair string exemple : BTCUSDT
