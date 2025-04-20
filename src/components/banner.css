@@ -1,0 +1,87 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Arsenal:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Allura&display=swap');
+
+#banner{
+    background-color: black;
+    display: flex;
+    max-height: 155px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+}
+
+.nav a{
+    text-decoration: none;
+    color: inherit;
+}
+
+.nav ul{
+    list-style: none;
+    padding-right: 1rem;
+    margin: 0;
+    display: flex;
+    text-decoration: none;
+    font-family: 'Arsenal', sans-serif;
+    color: white;
+    gap: 1.5rem;
+}
+
+.banner-menu li {
+    display: inline-block;
+    font-family: 'Arsenal', sans-serif;
+    font-size: 1.2rem;
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.banner-menu li:hover {
+    font-weight: bolder;
+    color: #cccccc;
+}
+
+.banner-menu li.active {
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+#h_space {
+    max-width: 80px;
+    height: auto;
+    margin-right: 1rem;
+}
+
+#banner h1 {
+    font-size: 2.5rem;
+    font-family: 'Orbitron', sans-serif;
+    color: white;
+    display: inline;
+    align-self: center;
+}
+
+.site-title {
+    display: flex;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    #banner {
+        flex-direction: column;
+        max-height: none;
+        padding: 1rem;
+    }
+    
+    .nav ul {
+        margin-top: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    #banner h1 {
+        font-size: 2rem;
+    }
+    
+    #h_space {
+        max-width: 60px;
+    }
+}

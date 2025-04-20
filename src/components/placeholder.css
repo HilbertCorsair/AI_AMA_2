@@ -1,0 +1,20 @@
+div.greeting {
+    padding: 2rem 1rem;
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+#intro {
+    font-family: 'Allura', cursive;
+    font-size: 1.8rem;
+    color: #ffffff;
+    margin-bottom: 1.5rem;
+}
+
+#disclamer {
+    padding-top: 1rem;
+    font-family: 'Arsenal', sans-serif;
+    font-size: 1rem;
+    color: #cccccc;
+}

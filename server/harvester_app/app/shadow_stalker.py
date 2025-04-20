@@ -15,6 +15,7 @@ from sklearn.linear_model import LinearRegression
 class PriceTracker(Ops, RollingBufferMixin):
     def __init__(self, pair,di1, df1, pi1, pf1, di2, df2, pi2, pf2, prc_distance = 0.027, momentum = 1, update_frq = 15):
 
+        # Support model data
         self.Xs = np.array([[datetime.strptime(di1, "%Y-%m-%d %H:%M:%S").timestamp()], 
                             [datetime.strptime(df1, "%Y-%m-%d %H:%M:%S").timestamp()]])  # 2x1 array
         self.ys = np.array([pi1, pf1]).reshape(-1,1)
@@ -320,12 +321,12 @@ class PriceTracker(Ops, RollingBufferMixin):
             print(f"Tracking ... ")
 
     def interval_trading(self):
-        # Calculate top and bottom prices from grid slopes
         print(f"Current  price {self.current_price} USD")
         self.current_timestamp = datetime.now().timestamp()
-
-        # connstants or liniar variables
-        self.buy_threshold, self.take_profit = self.calculate_prices(self.current_timestamp)
+        
+        # Calculate top and bottom prices from linear regression models
+        # For constant support and resistence levels just use a touple 
+        self.buy_threshold, self.take_profit = self.calculate_prices(self.current_timestamp) #(0.6211, 0.6485)
 
         print(f'Activate at : {self.trigger}\nactive between {self.buy_threshold} and {self.take_profit}\nGoing UP - {self.up}\n')
         c0 = self.cooldown[0]
@@ -408,9 +409,8 @@ class PriceTracker(Ops, RollingBufferMixin):
                     else:
                         self.look_to_buy(ltp*0.985)
 
-
-                #This is where more trading options should be added.
-                #Logic alowing changing between trategies should also be added here. 
+                #Logic alowing changing between trategies should also be added here.
+                # For now choose the trading strategy by commenting or uncommenting the following lines 
                 #self.interval_trading()
                 #self.look_to_buy(0.6211)
                 self.look_to_sell(0.6315)

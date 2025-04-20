@@ -1,0 +1,29 @@
+@font-face {
+    font-family: 'Voltaire';
+    src: url('../../public/assets/Voltaire/Voltaire-Regular.woff2') format('woff2');
+    }
+
+#newsContainer{
+    display:block;
+}
+
+div div a {
+    max-width: 74%;
+    max-height: auto;
+    margin-bottom: 3px;
+    font-family: Voltaire;
+    font-size: 1.2rem;
+    text-decoration: none;
+}
+
+#fed_image {
+    max-width: 25%;
+    max-height: auto;
+    display: inline-flex;
+    flex-direction: column;
+  
+  }
+
+#newsContainer h1{
+    font-family: 'Voltaire'; 
+} 

@@ -1,0 +1,20 @@
+.links-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.links-container h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  color: #ffffff;
+}
+
+.links-container p {
+  font-family: 'Arsenal', sans-serif;
+  font-size: 1.2rem;
+  color: #cccccc;
+  margin-bottom: 1rem;
+}
