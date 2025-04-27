@@ -72,6 +72,7 @@ class PriceTracker(Ops, RollingBufferMixin):
         self._trigger = val
 
     def activate (self):
+        print("Activating :")
         self.record_price = self.current_price
         self.move_target()
         self.trigger = True
@@ -202,17 +203,22 @@ class PriceTracker(Ops, RollingBufferMixin):
             sleep(15)
 
     def move_target (self):
-        if self.up:
+        print(f"Setting up target distance at {self.prc_distance*100}, record price at {self.record_price}")
+        if self.up: 
+            print("Going up")
             #sets SELL target slightly under the last local high
-            self.target =  self.record_price - (self.record_price * self.prc_distance)
+            self.target = round(self.record_price + (self.record_price * self.prc_distance), 4)
+
         else:
+            print("Going down")
             # Sets BUY target slightly above the last local low
-            self.target = self.record_price + (self.record_price * self.prc_distance)
+            self.target = round(self.record_price - (self.record_price * self.prc_distance), 4)
+        print(f"New target set at {self.target}")
 
     def update_record(self, tr_type, price, quantity):
         self.transactions["date"].append(datetime.now().timestamp())
         self.transactions["type"].append(tr_type)
-        self.transactions["pair"].append(pair)
+        self.transactions["pair"].append(self.pair)
         self.transactions["price"].append(price)
         self.transactions["quantity"].append(quantity)
 
@@ -234,6 +240,7 @@ class PriceTracker(Ops, RollingBufferMixin):
             c3 = not self.up and self.current_price <= self.target # activates wlen looking to buy 
 
         if c1 and (c2 or c3):
+            print("Checkpoint 1")
             self.activate()
             self.move_target()
         # starts price trackikg if reigger is activated
@@ -266,34 +273,40 @@ class PriceTracker(Ops, RollingBufferMixin):
                 self.move_target()
                 print(f"New target is {self.target}")
 
-    def look_to_buy(self, price): 
+    def look_to_buy(self, price):
+        print(self.up)
         if not self.trigger :
             print(f"Price at {self.current_price}, looking to activate trackin for BUY order at {price}")
+            print(f"Activated: {self.trigger}")
 
             if self.current_price <= price:
-                print(f"Activating price tracking for sell order")
+                print(f"Activating price tracking for buy order")
                 self.activate()
         #Move target
-        elif not self.up and self.current_price < self.record_price:
+        elif self.current_price < self.record_price:
             self.record_price = self.current_price
             self.move_target()
             print(f'Updated target to {self.target}')
             sleep(2)
 
         #BUY
-        elif not self.up and self.current_price >= self.target:
+        elif self.current_price >= self.target:
             q = self.floor_to_n_digit(self.stash["USDC"]/self.target, 1)
             price = round(self.target, 4)
-            self.place_spot_order("BUY", self.pair, q, price)
+            self.place_spot_order("BUY", self.pair, q, self.current_price)
+            self.update_record("BUY", self.current_price, q)
             print(f"Bought {q} {self.pair}")
             self.cooldown = (True, 1)
             self.deactivate()
             self.freestyle= True
             sleep(3)
+            print(self.valuations)
+            print(self.bought)
         else:
             print(f"Tracking ... ")
 
     def look_to_sell(self, price):
+        print(f"Loocking to sell direction--{self.up} holding: {self.bought}")
         if not self.trigger :
             print(f"Price at {self.current_price}, looking to activate trackin for sell order at {price}")
 
@@ -301,7 +314,7 @@ class PriceTracker(Ops, RollingBufferMixin):
                 print(f"Activating price tracking for sell order")
                 self.activate()
         #Move target
-        elif (self.up and self.current_price > self.record_price) or not self.up and self.current_price < self.record_price:
+        elif self.current_price > self.record_price :
             self.record_price = self.current_price
             self.move_target()
             print(f'Updated target to {self.target}')
@@ -309,21 +322,25 @@ class PriceTracker(Ops, RollingBufferMixin):
 
         #SELL
         elif self.up and self.current_price <= self.target:
+            print(f"Time to sell {self.stash[self.bought]}")
             q = self.floor_to_n_digit(self.stash[self.bought], 1)
             price = self.floor_to_n_digit(self.target, 4)
-            self.place_spot_order("SELL", self.pair, q, price)
+            self.place_spot_order("SELL", self.pair, q, self.current_price)
+            self.update_record("SELL", self.current_price, q)
             print(f"Just sold {q}, {self.pair}, at {self.current_price}")
             self.cooldown = (True, -1)
             self.deactivate()
             self.freestyle = True
             sleep(2)
+            print(self.valuations)
+            print(self.bought)
         else:
             print(f"Tracking ... ")
 
     def interval_trading(self):
         print(f"Current  price {self.current_price} USD")
         self.current_timestamp = datetime.now().timestamp()
-        
+
         # Calculate top and bottom prices from linear regression models
         # For constant support and resistence levels just use a touple 
         self.buy_threshold, self.take_profit = self.calculate_prices(self.current_timestamp) #(0.6211, 0.6485)
@@ -400,10 +417,14 @@ class PriceTracker(Ops, RollingBufferMixin):
         try:
             if msg['e'] == '24hrTicker':
                 self.current_price = float(msg['c'])
+                print(f"Msg OK. price at {self.current_price}")
                 self.up = not self.usdc
+                print(self.bought, self.up)
                 self.check_oo()
                 if self.freestyle:
-                    ltp = self.transactions["price"]
+                    ltp = self.transactions["price"][-1]
+                    print(f"Freestyle mode")
+                    print(f"Last transaction : {ltp}")
                     if self.up :
                         self.look_to_sell(ltp*1.015)
                     else:
@@ -413,7 +434,7 @@ class PriceTracker(Ops, RollingBufferMixin):
                 # For now choose the trading strategy by commenting or uncommenting the following lines 
                 #self.interval_trading()
                 #self.look_to_buy(0.6211)
-                self.look_to_sell(0.6315)
+                self.look_to_buy(0.6557)
                 #self.api_calls()
 
 
@@ -463,6 +484,7 @@ class PriceTracker(Ops, RollingBufferMixin):
                 self.target = None
                 self.record_price = None
                 print(f"Just sold {q}, {self.pair}, at {self.current_price}")
+                print(self.bought)
 
 
             #Looking to BUY 
@@ -594,7 +616,7 @@ def main():
                            df2="2025-04-25 15:00:00",
                            pi2=0.6315,
                            pf2=0.6315,
-                           prc_distance= 0.00035)
+                           prc_distance= 0.0087)
 
 
     tracker.start_trading()
