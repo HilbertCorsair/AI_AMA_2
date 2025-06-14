@@ -17,10 +17,10 @@ class Coins(object):
             255, 2, 2, 5, 2,   69020,3.1,6.68,2070, 0.95,55.13,2.95,693,2.94,53.1,91.24, 666.7,544.7,
             4867, 260, 238, 147, 60, 1.37, 21.3, 0.842, 20.6, 44.8, 0.09, 0.26, 141, 2.9, 8, 45, 520, 8.5, 9.22, 0.167, 44.2,  625, 4.85, 19.23
             ]
-        self._of_interest =   ['SOL','PIXEL', "JUP", "WIF", "PYTH"  ,'BTC', 'ADA', 'MINA', "PAXG", "AGIX", "DOT", "AR", "LINK"]
+        self._of_interest =  ["BTC", "ADA"] # ['SOL','PIXEL', "JUP", "WIF", "PYTH"  ,'BTC', 'ADA', 'MINA', "PAXG", "AGIX", "DOT", "AR", "LINK"]
 
-        self._BUSD_decs = [ 2, 4, 4, 4, 4,    2, 4, 3, 0, 5, 2, 3, 3]
-        self._C_decs =    [ 2, 1, 1, 1, 1,    5, 1, 1, 4, 0, 3, 2, 2]
+        self._BUSD_decs = [0, 5] # [ 2, 4, 4, 4, 4,    2, 4, 3, 0, 5, 2, 3, 3]
+        self._C_decs =    [4, 0]#[ 2, 1, 1, 1, 1,    5, 1, 1, 4, 0, 3, 2, 2]
 
     def get_mins_tops(self):
         mins_dict = dict(zip(self._coins, self.mins))

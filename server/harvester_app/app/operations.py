@@ -22,7 +22,7 @@ class Ops (C):
         self.rop , self.rca = self.get_roundings()
         self.data_files_pth = "/root/AI_AMA_2/server/harvester_app/data/"
         self.tr_record_pth = "../data/transactions.pkl"
-        self.live_price = {"MINAUSDT": None, "error": False}
+        #self.live_price = {self.pair: None, "error": False}
         self.cli = self.unlock()
         self.pairs = self.get_pairs()
         self.balance = [self.cli.get_asset_balance(c)for c in self._of_interest + ["USDC"]]
