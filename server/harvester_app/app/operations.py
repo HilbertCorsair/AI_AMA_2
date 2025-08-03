@@ -38,6 +38,7 @@ class Ops (C):
         return pairs
 
     def update_valuations(self):
+        self.stash = dict(zip(self._of_interest + ["USDC"], [float(d["free"]) for d in self.balance if d["asset"] in self._of_interest + ["USDC"]]))
         valuations = {}
         for k, val in self.prices_dict.items():
             coin = [c for c in self._of_interest if c in k][0]

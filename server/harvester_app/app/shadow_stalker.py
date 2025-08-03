@@ -16,20 +16,19 @@ class PriceTracker(Ops, RollingBufferMixin):
     def __init__(self, pair,di1, df1, pi1, pf1, di2, df2, pi2, pf2, prc_distance = 0.027, momentum = 1, update_frq = 15):
 
         # Support model data
-        self.Xs = np.array([[datetime.strptime(di1, "%Y-%m-%d %H:%M:%S").timestamp()], 
-                            [datetime.strptime(df1, "%Y-%m-%d %H:%M:%S").timestamp()]])  # 2x1 array
+        self.Xs = np.array([datetime.strptime(di1, "%Y-%m-%d %H:%M:%S").timestamp(), 
+                            datetime.strptime(df1, "%Y-%m-%d %H:%M:%S").timestamp()]).reshape(-1,1)  # 2x1 array
         self.ys = np.array([pi1, pf1]).reshape(-1,1)
 
         # Resistance model data
-        self.Xr = np.array([[datetime.strptime(di2, "%Y-%m-%d %H:%M:%S").timestamp()],
-                            [datetime.strptime(df2, "%Y-%m-%d %H:%M:%S").timestamp()]])  # 2x1 array
+        self.Xr = np.array([datetime.strptime(di2, "%Y-%m-%d %H:%M:%S").timestamp(),
+                            datetime.strptime(df2, "%Y-%m-%d %H:%M:%S").timestamp()]).reshape(-1,1)  # 2x1 array
         self.yr = np.array([pi2, pf2]).reshape(-1,1)
-
         self.support_model = LinearRegression()
-        self.resistence_model = LinearRegression()
+        self.resistance_model = LinearRegression()
 
         self.support_model.fit(X=self.Xs, y=self.ys)
-        self.resistence_model.fit(X=self.Xr, y=self.yr)
+        self.resistance_model.fit(X=self.Xr, y=self.yr)
 
         self.transactions = {"type" : [],
                             "date" : [],
@@ -62,7 +61,7 @@ class PriceTracker(Ops, RollingBufferMixin):
         self._take_profit = None
         self.cooldown = (False, 0)
         self.freestyle = False
-        self.stoploss = 0.6723
+        self.stoploss = 0.5165
 
 
     @property
@@ -84,6 +83,7 @@ class PriceTracker(Ops, RollingBufferMixin):
         self.record_price = None
         self.target = None
 
+
     @property
     def current_timestamp(self):
         """Get the current timestamp."""
@@ -100,10 +100,7 @@ class PriceTracker(Ops, RollingBufferMixin):
         return self._buy_threshold
 
     @buy_threshold.setter
-    def buy_threshold(self, value):
-        """Set the buy threshold value."""
-        if not isinstance(value, (int, float)) and value is not None:
-            raise ValueError("Buy threshold must be a number or None")
+    def buy_threshold (self, value):
         self._buy_threshold = value
 
     @property
@@ -167,9 +164,15 @@ class PriceTracker(Ops, RollingBufferMixin):
         self._prc_distance = new_prc_distance
 
     def calculate_prices(self, current_timestamp):
+        print("-"*25,"CALCULATING price intervals:", "-"*25)
+        print(f"support : {self.Xs, self.ys}")
+        print(f"res: {self.Xr}, {self.yr}")
         current_timestamp = np.array(current_timestamp).reshape(-1, 1 )
-        top_price= self.floor_to_n_digit(self.resistence_model.predict(current_timestamp), 4)
-        bottom_price = 0.7221#self.floor_to_n_digit(self.support_model.predict(current_timestamp), 4)
+        top_price= self.floor_to_n_digit(self.resistance_model.predict(current_timestamp), 4)
+        bottom_price =self.floor_to_n_digit(self.support_model.predict(current_timestamp), 4)
+        print(f"timestamp : {current_timestamp}\ntop: {top_price}\nbottom: {bottom_price}")
+        print("-"*50)
+
         return bottom_price, top_price
 
     def mock_buy(self, q):
@@ -253,6 +256,7 @@ class PriceTracker(Ops, RollingBufferMixin):
                 self.target = None
                 self.record_price = None
                 self.deactivate()
+                self.valuations = self.update_valuations()
                 print(f"Just sold {q}, {self.pair}, at {self.current_price}")
                 self.cooldown = (True, -1)
 
@@ -263,6 +267,7 @@ class PriceTracker(Ops, RollingBufferMixin):
                 print(f"Bought {q} MINA")
                 self.target= None
                 self.record_price = None
+                self.valuations = self.update_valuations()
                 self.deactivate()
                 self.cooldown = (True,1)
 
@@ -291,7 +296,7 @@ class PriceTracker(Ops, RollingBufferMixin):
         #BUY
         elif self.current_price >= self.target:
             print(f"Buy condition met : {self.current_price} > = {self.target}")
-            q = self.floor_to_n_digit(self.stash["USDC"]/self.target, 1)
+            q = self.floor_to_n_digit(self.stash["USDC"]/self.target, 0) - 10
             price = round(self.target, 4)
             print(f"Placing buy order at {self.current_price}")
             self.place_spot_order("BUY", self.pair, q, self.current_price)
@@ -299,12 +304,13 @@ class PriceTracker(Ops, RollingBufferMixin):
             print(f"Bought {q} {self.pair}")
             #self.cooldown = (True, 1)
             self.deactivate()
+            self.valuations = self.update_valuations()
             self.freestyle= True
             self.stoploss = price * 0.9965
-            self.update_valuations()
             sleep(3)
             print(self.valuations)
             print(self.bought)
+            print("Direction check: up: ", self.up)
         else:
             print(f"Tracking ... ")
 
@@ -333,31 +339,40 @@ class PriceTracker(Ops, RollingBufferMixin):
             print(f"Just sold {q}, {self.pair}, at {self.current_price}")
             #self.cooldown = (True, -1)
             self.deactivate()
+            self.valuations = self.update_valuations()
             self.freestyle = True
             self.stoploss = price * 1.0035
             sleep(2)
-            self.update_valuations()
             print(self.valuations)
+
             print(self.bought)
+            print(self.stash)
+            print(f"Upcheck : {self.up}")
         else:
             print(f"Tracking ... ")
 
     def interval_trading(self):
-        print(f"Current  price {self.current_price} USD")
+        print(f"{'='*50}\nCurrent  price {self.current_price} USD")
+        print(self.up, f" - holding ADA\nTrigger - {self.trigger}")
         self.current_timestamp = datetime.now().timestamp()
 
         # Calculate top and bottom prices from linear regression models
-        # For constant support and resistence levels just use a touple 
+        # For constant support and resistance levels just use a touple 
         self.buy_threshold, self.take_profit = self.calculate_prices(self.current_timestamp) #(0.6211, 0.6485)
-
-        print(f'Activate at : {self.trigger}\nactive between {self.buy_threshold} and {self.take_profit}\nGoing UP - {self.up}\n')
+        print(self.buy_threshold, "--", self.take_profit )
+        if self.up:
+            if not self.trigger:
+                print(f"Activation at {self.take_profit}")
+        else:
+            if not self.trigger:
+                print(f"Activation at {self.buy_threshold}")
         c0 = self.cooldown[0]
         c05 = self.cooldown[1] > 0
         c1 = not self.trigger
         c2 = self.up and self.current_price >= self.take_profit # activates looking to sell
         c3 = not self.up and self.current_price <= self.buy_threshold # activates looking to buy 
         self.check_oo()
-        print(f"Conditionals state: {[c0, c05, c1, c2, c3]}")
+        print(f"Conditionals state: {[c0, c05, c1, c2, c3]}\n{'=' * 50}")
 
         #If on cooldown check temperature ---> check if price moves back into the intervall and mind the direction!
         #This is to prevent buying imediatly after selling when outside the intervall.
@@ -401,6 +416,13 @@ class PriceTracker(Ops, RollingBufferMixin):
             self.place_spot_order("SELL", self.pair, q, price)
             print(f"Just sold {q}, {self.pair}, at {self.current_price}")
             self.cooldown = (True, -1)
+            self.update_record("SELL", self.current_price, q)
+            self.deactivate()
+            self.valuations = self.update_valuations()
+            self.stoploss = price * 1.0087
+            if not self.usdc or self.usdc < 10:
+                self.usdc = q * price
+                self.up = False
             self.deactivate()
             sleep(3)
 
@@ -413,6 +435,9 @@ class PriceTracker(Ops, RollingBufferMixin):
             print(f"Bought {q} {self.pair}")
             self.cooldown = (True, 1)
             self.deactivate()
+            self.update_record("BUY", self.current_price, q)
+            self.valuations = self.update_valuations()
+            self.stoploss = price * 0.0087
             sleep(3)
         else:
             print(f"Current prce {self.current_price} within range, activation at {self.take_profit}:  Monitoring ...  ")
@@ -431,9 +456,9 @@ class PriceTracker(Ops, RollingBufferMixin):
                     print(f"Freestyle mode")
                     print(f"Last transaction : {ltp}")
                     if self.up :
-                        self.look_to_sell(ltp*1.015)
+                        self.look_to_sell(ltp*1.035)
                     else:
-                        self.look_to_buy(ltp*0.985)
+                        self.look_to_buy(ltp*0.965)
 
                 elif (self.usdc and self.current_price >= self.stoploss) or (self.up  and  self.current_price <= self.stoploss):
                     print("Stopped out ! ")
@@ -447,7 +472,7 @@ class PriceTracker(Ops, RollingBufferMixin):
                         print(f"Bought {q} {self.pair}")
                         #self.cooldown = (True, 1)
                         self.deactivate()
-                        self.update_valuations()
+                        self.valuations = self.update_valuations()
                         self.stoploss = self.current_price * 0.9965
                         self.freestyle= True
                     else : 
@@ -458,16 +483,14 @@ class PriceTracker(Ops, RollingBufferMixin):
                         self.update_record("SELL", self.current_price, q)
                         print(f"Just sold {q}, {self.pair}, at {self.current_price}")
                         self.deactivate()
-                        self.update_valuations()
+                        self.valuations = self.update_valuations()
                         self.stoploss = self.current_price * 1.0035
                         self.freestyle = True 
-
-
                 #Logic alowing changing between trategies should also be added here.
                 # For now choose the trading strategy by commenting or uncommenting the following lines 
-                #self.interval_trading()
                 else :
-                    self.look_to_sell(0.7115)
+                    #self.interval_trading()
+                    self.look_to_sell(0.6981)
                 #else :
                 #    self.look_to_buy(0.7235)
                 #self.api_calls()
@@ -537,7 +560,7 @@ class PriceTracker(Ops, RollingBufferMixin):
         self.twm.start_symbol_ticker_socket(callback=self.handle_ticker, symbol=self.pair)
         print(f"Monitoring {self.pair} target at {self.take_profit} or {self.buy_threshold} up >> {self.up}, acttivated : {self.trigger}")
 
-    def api_calls(self):
+    '''def api_calls(self):
         #c = 0
         while True :
             try:
@@ -547,6 +570,8 @@ class PriceTracker(Ops, RollingBufferMixin):
             except:
                 self.current_price = None
 
+            if not self.current_price:
+                while not self.current_price:
             if not self.current_price:
                 while not self.current_price:
                     print("Trying to fetch the price")
@@ -622,12 +647,10 @@ class PriceTracker(Ops, RollingBufferMixin):
                     print(f"Bought {q} {self.pair}")
                     self.cooldown = (True, 1)
                     self.deactivate()
-                    sleep(3)
-                else:
                     print(f"Current prce {self.current_price} within range, activation at {self.take_profit}:  Monitoring ...  ")
                     sleep(1)
 
-            sleep(7)
+            sleep(7)'''
 
 
 
@@ -639,17 +662,17 @@ class PriceTracker(Ops, RollingBufferMixin):
 
 def main():
     tracker = PriceTracker(pair="ADAUSDC",
-                           di1="2025-04-15 23:00:00",
-                           df1="2025-04-21 22:00:00",
-                           pi1=0.6021,
-                           pf1=0.6399,
+                           di1="2025-07-11 05:00:00",
+                           df1="2025-07-24 05:00:00",
+                           pi1=0.6104,
+                           pf1=0.9257,
 
-                           di2="2025-05-10 22:00:00",
-                           df2="2025-05-29 10:00:00",
-                           pi2=0.8296,
-                           pf2=0.6705,
+                           di2="2025-07-11 07:00:00",
+                           df2="2025-07-24 06:00:00",
+                           pi2=0.7493,
+                           pf2=0.9707,
 
-                           prc_distance= 0.0055)
+                           prc_distance= 0.0007)
     tracker.of_interest = ["BTC", "ADA"]
 
 
